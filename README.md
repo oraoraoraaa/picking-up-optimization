@@ -24,4 +24,4 @@ This project uses the [Amap (高德地图) API](https://lbs.amap.com/) for map d
 
 ![miku_banner](https://github.com/user-attachments/assets/fde68ddd-f57b-42af-b13b-61099dc812fb)
 
-Move to the [wiki page](https://github.com/oraoraoraaa/picking-up-optimization/wiki) to check developing documentation.
+Move to the [wiki page](https://github.com/oraoraoraaa/picking-up-optimization/wiki/For-Developers) to check contribution guideline.
