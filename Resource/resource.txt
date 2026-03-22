@@ -1,0 +1,3 @@
+Use this directory to store resources such as images, banners, and similar files.
+
+If an appropriate category folder does not exist, create a new one for your resources.

@@ -1,0 +1,19 @@
+# Standard Cargo build output directory
+target/
+
+# Cargo.lock file for library crates (handy for apps to use their own)
+# (uncomment the following line if your project is a library)
+# Cargo.lock
+
+# rust-analyzer cache
+.rust-analyzer/
+
+# VS Code Files
+.vscode/
+
+# IntelliJ/RustRover project files
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db
