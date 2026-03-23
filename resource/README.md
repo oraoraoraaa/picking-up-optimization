@@ -1,4 +1,4 @@
-# Resource
+# `resource`
 
 Use this directory to store resources such as images, banners, and similar files.
 

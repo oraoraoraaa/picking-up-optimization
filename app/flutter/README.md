@@ -1,4 +1,4 @@
-# pickup_op_flutter
+# The Flutter App
 
 A new Flutter project.
 

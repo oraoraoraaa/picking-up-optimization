@@ -1,4 +1,4 @@
-# Resource/docs
+# `resource/docs`
 
 Store documentation assets that are referenced by markdown or technical docs in this folder.
 

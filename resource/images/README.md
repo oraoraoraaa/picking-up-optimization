@@ -1,4 +1,4 @@
-# Resource/images
+# `resource/images`
 
 Store general image assets that do not belong in banners or icons.
 

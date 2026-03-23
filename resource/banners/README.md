@@ -1,4 +1,4 @@
-# Resource/banners
+# `resource/banners`
 
 Store banner assets for docs, web pages, and promotional content in this folder.
 

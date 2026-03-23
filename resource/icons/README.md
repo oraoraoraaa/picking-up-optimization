@@ -1,4 +1,4 @@
-# Resource/icons
+# `resource/icons`
 
 Store icon assets used by applications, documentation, and branding in this folder.
 
