@@ -103,3 +103,5 @@ Read them thoroughly before you make any contribution.
 Again, if any of the changes does not fit in the guideline addressed in the documentation, it would be desk-rejected during review.
 
 ## That's All, Happy Coding
+
+(p.s. Your next step could probably in [`docs/PLAN.md`](https://github.com/oraoraoraaa/picking-up-optimization/blob/main/docs/PLAN.md))

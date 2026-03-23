@@ -4,12 +4,10 @@
 
 ### What to do
 
-- Lock architecture and interfaces before deeper coding.
 - Build vertical slice prototype quickly.
 
 ### How to do
 
-- Create ADR-001 for architecture and ADR-002 for Flutter-Rust bridge choice.
 - Implement a vertical slice:
   - Hardcoded passenger/driver locations.
   - Fetch traffic/route data from Amap.
@@ -18,6 +16,8 @@
 - Measure first meaningful latency and verify bridge stability.
 
 ---
+
+> ![miku_cheering](https://github.com/user-attachments/assets/72b1bba0-1cad-470d-9448-0d8cc5b33b32)
 
 ## 1. Product Scope and Success Criteria (DONE)
 
