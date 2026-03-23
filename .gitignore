@@ -17,3 +17,105 @@ target/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# -----------------------------------------------------------------------------
+# Consolidated ignore rules from pickup_op_flutter
+# -----------------------------------------------------------------------------
+
+# Source: pickup_op_flutter/.gitignore
+/pickup_op_flutter/**/*.class
+/pickup_op_flutter/**/*.log
+/pickup_op_flutter/**/*.pyc
+/pickup_op_flutter/**/*.swp
+/pickup_op_flutter/**/.DS_Store
+/pickup_op_flutter/**/.atom/
+/pickup_op_flutter/**/.build/
+/pickup_op_flutter/**/.buildlog/
+/pickup_op_flutter/**/.history
+/pickup_op_flutter/**/.svn/
+/pickup_op_flutter/**/.swiftpm/
+/pickup_op_flutter/**/migrate_working_dir/
+/pickup_op_flutter/**/.iml
+/pickup_op_flutter/**/.ipr
+/pickup_op_flutter/**/.iws
+/pickup_op_flutter/**/.idea/
+/pickup_op_flutter/**/doc/api/
+/pickup_op_flutter/**/ios/Flutter/.last_build_id
+/pickup_op_flutter/.dart_tool/
+/pickup_op_flutter/.flutter-plugins-dependencies
+/pickup_op_flutter/.pub-cache/
+/pickup_op_flutter/.pub/
+/pickup_op_flutter/build/
+/pickup_op_flutter/coverage/
+/pickup_op_flutter/**/app.*.symbols
+/pickup_op_flutter/**/app.*.map.json
+/pickup_op_flutter/android/app/debug
+/pickup_op_flutter/android/app/profile
+/pickup_op_flutter/android/app/release
+
+# Source: pickup_op_flutter/android/.gitignore
+/pickup_op_flutter/android/gradle-wrapper.jar
+/pickup_op_flutter/android/.gradle
+/pickup_op_flutter/android/captures/
+/pickup_op_flutter/android/gradlew
+/pickup_op_flutter/android/gradlew.bat
+/pickup_op_flutter/android/local.properties
+/pickup_op_flutter/android/GeneratedPluginRegistrant.java
+/pickup_op_flutter/android/.cxx/
+/pickup_op_flutter/android/key.properties
+/pickup_op_flutter/android/**/*.keystore
+/pickup_op_flutter/android/**/*.jks
+
+# Source: pickup_op_flutter/ios/.gitignore
+/pickup_op_flutter/ios/**/dgph
+/pickup_op_flutter/ios/*.mode1v3
+/pickup_op_flutter/ios/*.mode2v3
+/pickup_op_flutter/ios/*.moved-aside
+/pickup_op_flutter/ios/*.pbxuser
+/pickup_op_flutter/ios/*.perspectivev3
+/pickup_op_flutter/ios/**/*sync/
+/pickup_op_flutter/ios/.sconsign.dblite
+/pickup_op_flutter/ios/.tags*
+/pickup_op_flutter/ios/**/.vagrant/
+/pickup_op_flutter/ios/**/DerivedData/
+/pickup_op_flutter/ios/Icon?
+/pickup_op_flutter/ios/**/Pods/
+/pickup_op_flutter/ios/**/.symlinks/
+/pickup_op_flutter/ios/profile
+/pickup_op_flutter/ios/xcuserdata
+/pickup_op_flutter/ios/**/.generated/
+/pickup_op_flutter/ios/Flutter/App.framework
+/pickup_op_flutter/ios/Flutter/Flutter.framework
+/pickup_op_flutter/ios/Flutter/Flutter.podspec
+/pickup_op_flutter/ios/Flutter/Generated.xcconfig
+/pickup_op_flutter/ios/Flutter/ephemeral/
+/pickup_op_flutter/ios/Flutter/app.flx
+/pickup_op_flutter/ios/Flutter/app.zip
+/pickup_op_flutter/ios/Flutter/flutter_assets/
+/pickup_op_flutter/ios/Flutter/flutter_export_environment.sh
+/pickup_op_flutter/ios/ServiceDefinitions.json
+/pickup_op_flutter/ios/Runner/GeneratedPluginRegistrant.*
+!/pickup_op_flutter/ios/default.mode1v3
+!/pickup_op_flutter/ios/default.mode2v3
+!/pickup_op_flutter/ios/default.pbxuser
+!/pickup_op_flutter/ios/default.perspectivev3
+
+# Source: pickup_op_flutter/linux/.gitignore
+/pickup_op_flutter/linux/flutter/ephemeral
+
+# Source: pickup_op_flutter/macos/.gitignore
+/pickup_op_flutter/macos/**/Flutter/ephemeral/
+/pickup_op_flutter/macos/**/Pods/
+/pickup_op_flutter/macos/**/dgph
+/pickup_op_flutter/macos/**/xcuserdata/
+
+# Source: pickup_op_flutter/windows/.gitignore
+/pickup_op_flutter/windows/flutter/ephemeral/
+/pickup_op_flutter/windows/*.suo
+/pickup_op_flutter/windows/*.user
+/pickup_op_flutter/windows/*.userosscache
+/pickup_op_flutter/windows/*.sln.docstates
+/pickup_op_flutter/windows/x64/
+/pickup_op_flutter/windows/x86/
+/pickup_op_flutter/windows/*.[Cc]ache
+!/pickup_op_flutter/windows/*.[Cc]ache/
