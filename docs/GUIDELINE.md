@@ -62,7 +62,7 @@ Minimum knowledge expected:
 ## 1. Commit Message Convention
 
 All commits must follow the Conventional Commits specification:
-https://www.conventionalcommits.org/en/v1.0.0/#specification
+https://www.conventionalcommits.org/en/v1.0.0/
 
 Pull requests that do not follow this convention are likely to be desk-rejected during review.
 
