@@ -2,6 +2,8 @@
 
 Desktop UI for the V1 vertical slice.
 
+Whenever you modify the files in this folder, please update the description below.
+
 ## What This App Does
 
 - Launches the Rust analyzer in `../../core` using `cargo run --quiet`
