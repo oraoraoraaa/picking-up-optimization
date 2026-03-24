@@ -24,7 +24,7 @@ This project uses the [Amap (高德地图) API](https://lbs.amap.com/) for map d
 
 > Contents below this line is for developers only.
 
-![miku_for_developers](https://github.com/user-attachments/assets/ac3a4698-7ce8-44d1-8aeb-57539ae1cc01)
+![miku_for_developers](https://github.com/user-attachments/assets/4dbef352-5442-484e-bdbd-c2eea49d2114)
 
 Move to the [contribution guideline](https://github.com/oraoraoraaa/picking-up-optimization/blob/main/docs/GUIDELINE.md) to check contribution guideline.
 
