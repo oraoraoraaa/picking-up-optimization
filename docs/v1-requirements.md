@@ -13,21 +13,14 @@ Picking-Up Optimization is a tool designed to optimize the process of a driver p
     - The app calculates and displays the fastest pickup point based on the current traffic conditions.
     - The app suggests alternative pickup points and shows ETA tradeoffs for each.
     - The passenger can view and select from suggested alternatives.
+    - The app explains the rationale for each recommendation (e.g., ETA savings, mode used).
 
 ### Driver Side (Simulated in V1)
 
-- **Story:** As a driver, I want to receive a route to the selected pickup point and get ETA updates, so I can efficiently reach the passenger.
+- **Story:** As a driver, I want to know where I can efficiently meet up the passenger conveniently.
   - **Acceptance Criteria:**
-    - The app provides a route and ETA to the selected pickup point.
-    - ETA updates are shown as conditions change.
-
-### Shared Features
-
-- **Story:** As a user (passenger or driver), I want to see a map, select points, compare routes, and understand why a recommendation was made. I also want to see the real-time location of both the driver and the passenger.
-  - **Acceptance Criteria:**
-    - The app displays a map with pickup points and routes.
-    - Users can select and compare different pickup points/routes.
-    - The app explains the rationale for each recommendation (e.g., ETA savings, mode used).
+    - The app provides a pickup point and the ETA to there.
+    - The app should provide meet up point that is convenient for picking up (e.g. normal road side, metro station, bus station, etc.).
 
 ## Non-Functional Requirements
 

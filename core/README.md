@@ -2,6 +2,31 @@
 
 The core RUST implementation like domain, optimization engine, scoring, route fusion, caching policy, etc. should be put in this directory.
 
+## Vertical Slice Entry Point
+
+The first vertical slice prototype lives in `src/main.rs`.
+
+It currently does the following:
+
+- Uses hardcoded passenger/driver + pickup candidate locations
+- Fetches route durations from Amap for driving/walking/bicycle/transit when `AMAP_KEY` is available
+- Applies simple scoring (`driver_eta + passenger_eta`)
+- Ranks and returns the top 3 recommendations as JSON
+- Falls back to deterministic ETA estimates when API calls are unavailable
+
+Run it with:
+
+```bash
+cd core
+cargo run --quiet
+```
+
+Optional key setup:
+
+```bash
+export AMAP_KEY="your_amap_web_service_key"
+```
+
 ## Contributor Rule
 
 1. Make sure you fully understand where you should modify or add new files.

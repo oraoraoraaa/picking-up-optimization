@@ -1,17 +1,18 @@
 # The Flutter App
 
-A new Flutter project.
+Desktop UI for the V1 vertical slice.
 
-## Getting Started
+## What This App Does
 
-This project is a starting point for a Flutter application.
+- Launches the Rust analyzer in `../../core` using `cargo run --quiet`
+- Reads JSON recommendations from stdout
+- Displays top 3 pickup options with mode and ETA breakdown
 
-A few resources to get you started if this is your first Flutter project:
+## Run
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+cd app/flutter
+flutter run -d linux
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+If `AMAP_KEY` is available in the shell environment, the Rust analyzer will call Amap APIs. Otherwise, the analyzer returns fallback ETA estimates.

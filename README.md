@@ -25,3 +25,29 @@ This project uses the [Amap (高德地图) API](https://lbs.amap.com/) for map d
 ![miku_banner](https://github.com/user-attachments/assets/fde68ddd-f57b-42af-b13b-61099dc812fb)
 
 Move to the [contribution guideline](https://github.com/oraoraoraaa/picking-up-optimization/blob/main/docs/GUIDELINE.md) to check contribution guideline.
+
+## V1 Vertical Slice Prototype
+
+This repository now contains a working vertical slice prototype:
+
+- Hardcoded passenger and driver locations
+- Rust scoring across baseline + alternatives and walking/bicycle/transit modes
+- Amap route/traffic fetching when `AMAP_KEY` is provided
+- Top 3 ranked options displayed in the Flutter desktop app
+
+### Run It
+
+1. Optional but recommended: set your Amap key.
+
+```bash
+export AMAP_KEY="your_amap_web_service_key"
+```
+
+2. Run the Flutter desktop app.
+
+```bash
+cd app/flutter
+flutter run -d linux
+```
+
+The app triggers the Rust analyzer (`core`) via `cargo run --quiet` and renders top options. If Amap calls fail or no key is set, the prototype falls back to deterministic ETA estimation so the slice remains runnable.
