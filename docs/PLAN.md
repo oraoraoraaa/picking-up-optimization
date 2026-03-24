@@ -17,7 +17,7 @@
 
 ---
 
-> ![miku_cheering](https://github.com/user-attachments/assets/72b1bba0-1cad-470d-9448-0d8cc5b33b32)
+> ![miku_support](https://github.com/user-attachments/assets/461ada5a-7fd9-4a00-980a-fc94eec6e150)
 
 ## 1. Product Scope and Success Criteria (DONE)
 

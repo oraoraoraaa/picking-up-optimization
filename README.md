@@ -20,13 +20,17 @@ This software continuously analyzes real-time traffic conditions and re-calculat
 
 This project uses the [Amap (高德地图) API](https://lbs.amap.com/) for map data, real-time traffic information, and route planning.
 
-## For Developers
+---
 
-![miku_banner](https://github.com/user-attachments/assets/fde68ddd-f57b-42af-b13b-61099dc812fb)
+> Contents below this line is for developers only.
+
+![miku_for_developers](https://github.com/user-attachments/assets/ac3a4698-7ce8-44d1-8aeb-57539ae1cc01)
 
 Move to the [contribution guideline](https://github.com/oraoraoraaa/picking-up-optimization/blob/main/docs/GUIDELINE.md) to check contribution guideline.
 
-## V1 Vertical Slice Prototype
+## Notice
+
+### V1 Vertical Slice Prototype
 
 This repository now contains a working vertical slice prototype:
 
@@ -35,7 +39,7 @@ This repository now contains a working vertical slice prototype:
 - Amap route/traffic fetching when `AMAP_KEY` is provided
 - Top 3 ranked options displayed in the Flutter desktop app
 
-### Run It
+#### Run It
 
 1. Optional but recommended: set your Amap key.
 

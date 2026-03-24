@@ -1,6 +1,6 @@
 # Contributing Guide
 
-> ![miku_banner](https://github.com/user-attachments/assets/20134045-e068-4d05-b6ba-582f0e8514a1)
+> ![miku_obey_rules](https://github.com/user-attachments/assets/23b2cb1a-c140-40b3-8aac-259c73e6163c)
 
 This document is for developers contributing to this repository.
 
