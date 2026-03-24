@@ -179,7 +179,15 @@ class _VerticalSlicePageState extends State<VerticalSlicePage> {
 }
 
 Future<RecommendationSet> _runRustAnalyzer() async {
-  const rustCoreDirectory = '../../core';
+  // use env.PWD first, and use cwd as a fallback
+  const rustCoreRelativeDirectory = '../../core';
+  final pwd = Platform.environment['PWD'];
+  final baseDirectory = (pwd != null && pwd.isNotEmpty)
+      ? pwd
+      : Directory.current.path;
+  final rustCoreDirectory = Directory.fromUri(
+    Directory(baseDirectory).uri.resolve('$rustCoreRelativeDirectory/'),
+  ).path;
 
   final result = await Process.run(
     'cargo',
