@@ -1,6 +1,8 @@
 # Direction Planning
 
-> For more detailed information, visit `https://lbs.amap.com/api/webservice/guide/api/direction/`.
+> This document is mostly copied from the webpage: `https://lbs.amap.com/api/webservice/guide/api/direction/`.
+>
+> For more detailed information, visit the website.
 
 ## Walking
 
@@ -27,10 +29,10 @@
 ### Example
 
 ```sh
-https://restapi.amap.com/v3/direction/walking?output=json&origin=108.983741,34.246233&destination=108.94703,34.25943&key=<YOUR_KEY>
+https://restapi.amap.com/v3/geocode/geo?address=陕西省西安市新城区西安钟楼&output=JSON&key=<YOUR_KEY>
 ```
 
-Return value: See [`docs/amap/direction_walking.json`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/direction_walking.json).
+Return value: See [`docs/amap/geocoding.json`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/geocoding.json).
 
 ### Return Explanation
 

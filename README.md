@@ -28,6 +28,8 @@ This project uses the [Amap (高德地图) API](https://lbs.amap.com/) for map d
 
 Move to the [contribution guideline](https://github.com/oraoraoraaa/picking-up-optimization/blob/main/docs/GUIDELINE.md) to check contribution guideline.
 
+This project contains detailed and clear documentations. Reading them using web-ui is recommended as it might not be a pleasant experience to read the tables in raw `.md` files.
+
 ## Notice
 
 ### V1 Vertical Slice Prototype

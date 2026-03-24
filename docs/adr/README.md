@@ -13,5 +13,3 @@ This directory contains Architecture Decision Records (ADRs) for the project. AD
 ## Existing ADRs
 
 - [ADR-001: Project Architecture](ADR.md#adr-001-project-architecture)
-
-Refer to ADR-001 for the initial project architecture decision.

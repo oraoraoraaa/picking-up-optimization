@@ -1,0 +1,466 @@
+{
+  "status": "1",
+  "regeocode": {
+    "roads": [
+      {
+        "id": "029I49F02100812130",
+        "location": "108.947,34.2598",
+        "direction": "东南",
+        "name": "钟楼盘道",
+        "distance": "52.4182"
+      },
+      {
+        "id": "029I49F021008944",
+        "location": "108.948,34.2593",
+        "direction": "西",
+        "name": "东大街",
+        "distance": "53.0656"
+      },
+      {
+        "id": "029I49F0210081243",
+        "location": "108.947,34.2596",
+        "direction": "东南",
+        "name": "西大街",
+        "distance": "53.1414"
+      }
+    ],
+    "roadinters": [
+      {
+        "second_name": "北大街",
+        "first_id": "029I49F02100812130",
+        "second_id": "029I49F0210081456",
+        "location": "108.946803,34.259875",
+        "distance": "53.7385",
+        "first_name": "钟楼盘道",
+        "direction": "东南"
+      }
+    ],
+    "formatted_address": "陕西省西安市莲湖区北院门街道西安钟楼",
+    "addressComponent": {
+      "city": "西安市",
+      "province": "陕西省",
+      "adcode": "610104",
+      "district": "莲湖区",
+      "towncode": "610104002000",
+      "streetNumber": {
+        "number": "516号",
+        "location": "108.947680,34.258933",
+        "direction": "东南",
+        "distance": "81.3787",
+        "street": "东大街"
+      },
+      "country": "中国",
+      "township": "北院门街道",
+      "businessAreas": [
+        {
+          "location": "108.944702,34.254684",
+          "name": "南院门",
+          "id": "610103"
+        },
+        {
+          "location": "108.935043,34.261578",
+          "name": "北院门",
+          "id": "610104"
+        },
+        {
+          "location": "108.945251,34.263756",
+          "name": "西华门",
+          "id": "610104"
+        }
+      ],
+      "building": {
+        "name": "西安钟楼",
+        "type": "风景名胜;风景名胜相关;旅游景点"
+      },
+      "neighborhood": {
+        "name": [],
+        "type": []
+      },
+      "citycode": "029"
+    },
+    "aois": [
+      {
+        "area": "7193.170065",
+        "type": "110200",
+        "id": "B001D09TAA",
+        "location": "108.947030,34.259430",
+        "adcode": "610104",
+        "name": "西安钟楼",
+        "distance": "0"
+      },
+      {
+        "area": "11233497.115157",
+        "type": "110200",
+        "id": "B0KROZSZG0",
+        "location": "108.948296,34.263783",
+        "adcode": "610102",
+        "name": "西安城墙·碑林历史文化景区",
+        "distance": "0"
+      }
+    ],
+    "pois": [
+      {
+        "id": "B001D08YK4",
+        "direction": "东南",
+        "businessarea": "南院门",
+        "address": "解放市场6号",
+        "poiweight": "0.729334",
+        "name": "开元商城钟楼店",
+        "location": "108.948139,34.258584",
+        "distance": "138.705",
+        "tel": "029-87367219",
+        "type": "购物服务;商场;购物中心"
+      },
+      {
+        "id": "BV10069661",
+        "direction": "北",
+        "businessarea": "南院门",
+        "address": "2号线6号线",
+        "poiweight": "0.634231",
+        "name": "钟楼(地铁站)",
+        "location": "108.947068,34.261023",
+        "distance": "177.182",
+        "tel": [],
+        "type": "交通设施服务;地铁站;地铁站"
+      },
+      {
+        "id": "B001D01E65",
+        "direction": "东北",
+        "businessarea": "南院门",
+        "address": "柏树林街道东大街619号(钟楼地铁站6号口步行60米)",
+        "poiweight": "0.392122",
+        "name": "钟楼邮电广场",
+        "location": "108.947960,34.260139",
+        "distance": "116.273",
+        "tel": [],
+        "type": "商务住宅;楼宇;商务写字楼"
+      },
+      {
+        "id": "BX10014043",
+        "direction": "北",
+        "businessarea": "南院门",
+        "address": "2号线",
+        "poiweight": "0.339779",
+        "name": "钟楼地铁站C口",
+        "location": "108.947015,34.260061",
+        "distance": "70.1931",
+        "tel": [],
+        "type": "交通设施服务;地铁站;出入口"
+      },
+      {
+        "id": "B001D01E63",
+        "direction": "东",
+        "businessarea": "南院门",
+        "address": "柏树林街道东大街383号(钟楼地铁站6号口步行70米)",
+        "poiweight": "0.371154",
+        "name": "方汇商厦",
+        "location": "108.948793,34.259865",
+        "distance": "169.102",
+        "tel": [],
+        "type": "商务住宅;楼宇;商务写字楼"
+      },
+      {
+        "id": "B0G3TOSUMA",
+        "direction": "东北",
+        "businessarea": "南院门",
+        "address": "东大街与北大街交叉口",
+        "poiweight": "0.280273",
+        "name": "易俗历史文化街区",
+        "location": "108.948034,34.260011",
+        "distance": "112.642",
+        "tel": [],
+        "type": "风景名胜;风景名胜相关;旅游景点"
+      },
+      {
+        "id": "B001D0WAR8",
+        "direction": "南",
+        "businessarea": "南院门",
+        "address": "南大街80号(钟楼地铁站3号口步行90米)",
+        "poiweight": "0.029729",
+        "name": "外贸国际",
+        "location": "108.946563,34.257688",
+        "distance": "198.401",
+        "tel": "13002977697",
+        "type": "商务住宅;楼宇;商务写字楼"
+      },
+      {
+        "id": "B0FFG77GE6",
+        "direction": "西",
+        "businessarea": "南院门",
+        "address": "钟鼓楼广场(钟楼地铁站C口步行230米)",
+        "poiweight": "0.367956",
+        "name": "钟鼓楼东广场",
+        "location": "108.945250,34.259845",
+        "distance": "169.977",
+        "tel": [],
+        "type": "风景名胜;公园广场;城市广场"
+      },
+      {
+        "id": "B0K69AP2YO",
+        "direction": "西",
+        "businessarea": "南院门",
+        "address": "钟楼盘道与北大街交叉口东南60米",
+        "poiweight": "0.328702",
+        "name": "西安钟楼落日观景台",
+        "location": "108.947025,34.259432",
+        "distance": "0.50786",
+        "tel": [],
+        "type": "风景名胜;风景名胜;风景名胜"
+      },
+      {
+        "id": "B0FFH34BVC",
+        "direction": "东南",
+        "businessarea": "南院门",
+        "address": "解放市场6号开元商城钟楼店B1层",
+        "poiweight": "0.42194",
+        "name": "屈臣氏(开元商城钟楼店店)",
+        "location": "108.947686,34.258655",
+        "distance": "105.182",
+        "tel": "029-87214882",
+        "type": "购物服务;超级市场;屈臣氏"
+      },
+      {
+        "id": "BX09902188",
+        "direction": "东",
+        "businessarea": "南院门",
+        "address": "6号线",
+        "poiweight": "0.24154",
+        "name": "钟楼地铁站E口",
+        "location": "108.947953,34.259375",
+        "distance": "85.055",
+        "tel": [],
+        "type": "交通设施服务;地铁站;出入口"
+      },
+      {
+        "id": "B0JKHA8FE4",
+        "direction": "西南",
+        "businessarea": "南院门",
+        "address": "南大街110号钟楼饭店正门西侧第一间",
+        "poiweight": "0.256761",
+        "name": "中国邮政储蓄银行(钟楼支行)",
+        "location": "108.946130,34.258824",
+        "distance": "106.699",
+        "tel": "029-87275463",
+        "type": "金融保险服务;银行;中国邮政储蓄银行"
+      },
+      {
+        "id": "B0FFF02ERY",
+        "direction": "东北",
+        "businessarea": "南院门",
+        "address": "西一路街道东大街619号(钟楼地铁站6号口步行50米)",
+        "poiweight": "0.10794",
+        "name": "西安市邮局钟楼支局办公楼",
+        "location": "108.947931,34.260060",
+        "distance": "108.474",
+        "tel": [],
+        "type": "商务住宅;楼宇;商务写字楼"
+      },
+      {
+        "id": "B0FFI9Q9YW",
+        "direction": "北",
+        "businessarea": "南院门",
+        "address": "北大街28号(钟楼地铁站B西口步行120米)",
+        "poiweight": "0.302546",
+        "name": "西安市北大街海林大厦",
+        "location": "108.946467,34.261117",
+        "distance": "194.595",
+        "tel": [],
+        "type": "商务住宅;楼宇;商住两用楼宇"
+      },
+      {
+        "id": "BX09905208",
+        "direction": "东",
+        "businessarea": "南院门",
+        "address": "6号线",
+        "poiweight": "0.241423",
+        "name": "钟楼地铁站出入口",
+        "location": "108.948519,34.259044",
+        "distance": "143.417",
+        "tel": [],
+        "type": "交通设施服务;地铁站;出入口"
+      },
+      {
+        "id": "B0FFKDMLGP",
+        "direction": "东北",
+        "businessarea": "南院门",
+        "address": "东大街619号东翼楼1-5层",
+        "poiweight": "0.281553",
+        "name": "西安钟楼森德酒店",
+        "location": "108.948130,34.259937",
+        "distance": "115.751",
+        "tel": "029-87215088;029-87215288",
+        "type": "住宿服务;宾馆酒店;宾馆酒店"
+      },
+      {
+        "id": "BX09902189",
+        "direction": "东",
+        "businessarea": "南院门",
+        "address": "6号线",
+        "poiweight": "0.24154",
+        "name": "钟楼地铁站J口",
+        "location": "108.947956,34.259534",
+        "distance": "85.896",
+        "tel": [],
+        "type": "交通设施服务;地铁站;出入口"
+      },
+      {
+        "id": "B0FFHQJJML",
+        "direction": "东南",
+        "businessarea": "南院门",
+        "address": "东大街钟楼开元商城三楼天美意专柜(钟楼地铁站出入口旁)",
+        "poiweight": "0.196068",
+        "name": "天美意(开元商城钟楼店店)",
+        "location": "108.948405,34.258571",
+        "distance": "158.404",
+        "tel": [],
+        "type": "购物服务;商场;商场"
+      },
+      {
+        "id": "B001D09CL8",
+        "direction": "西北",
+        "businessarea": "南院门",
+        "address": "西大街1号钟鼓楼世纪金花下沉广场",
+        "poiweight": "0.352269",
+        "name": "星巴克臻选(西安钟楼店)",
+        "location": "108.946314,34.260237",
+        "distance": "111.281",
+        "tel": "029-87265863",
+        "type": "餐饮服务;咖啡厅;星巴克咖啡"
+      },
+      {
+        "id": "B0JD65ULNT",
+        "direction": "西",
+        "businessarea": "南院门",
+        "address": "西大街与钟楼盘道交叉口西100米",
+        "poiweight": "0.277263",
+        "name": "西安市公安局莲湖分局暖心警务会客厅",
+        "location": "108.945475,34.259581",
+        "distance": "143.899",
+        "tel": [],
+        "type": "政府机构及社会团体;公检法机构;公安警察"
+      },
+      {
+        "id": "B0KUNLRP4V",
+        "direction": "东北",
+        "businessarea": "南院门",
+        "address": "新城区",
+        "poiweight": "0.364855",
+        "name": "钟楼",
+        "location": "108.947740,34.259968",
+        "distance": "88.5316",
+        "tel": [],
+        "type": "地名地址信息;热点地名;热点地名"
+      },
+      {
+        "id": "B0K07MHDOO",
+        "direction": "南",
+        "businessarea": "南院门",
+        "address": "南大街80号外贸国际F1层",
+        "poiweight": "0.297118",
+        "name": "清沐铂金酒店(西安钟楼地铁站回民街店)",
+        "location": "108.946765,34.257883",
+        "distance": "173.736",
+        "tel": "029-89620099;17319969878",
+        "type": "住宿服务;宾馆酒店;宾馆酒店"
+      },
+      {
+        "id": "B001D07MJZ",
+        "direction": "东南",
+        "businessarea": "南院门",
+        "address": "解放市场6号开元商城负一楼",
+        "poiweight": "0.235877",
+        "name": "星巴克(西安开元店)",
+        "location": "108.947678,34.258610",
+        "distance": "108.913",
+        "tel": "029-87387212",
+        "type": "餐饮服务;咖啡厅;星巴克咖啡"
+      },
+      {
+        "id": "B0J2UAISRO",
+        "direction": "东",
+        "businessarea": "南院门",
+        "address": "东大街解放市场6号开元商城1层1F-K-02号",
+        "poiweight": "0.202491",
+        "name": "奈雪的茶(西安钟楼开元商城店)",
+        "location": "108.948312,34.259110",
+        "distance": "123.076",
+        "tel": "17288521258",
+        "type": "餐饮服务;冷饮店;冷饮店"
+      },
+      {
+        "id": "B0LAY7WFR3",
+        "direction": "西",
+        "businessarea": "南院门",
+        "address": "西大街20号(钟楼地铁站J口步行420米)",
+        "poiweight": "0.296189",
+        "name": "西安钟鼓楼广场亚朵酒店",
+        "location": "108.944957,34.258921",
+        "distance": "198.754",
+        "tel": "029-87378166",
+        "type": "住宿服务;宾馆酒店;宾馆酒店"
+      },
+      {
+        "id": "B0FFFTPHX7",
+        "direction": "南",
+        "businessarea": "南院门",
+        "address": "南大街路东众汇美食广场3楼",
+        "poiweight": "0.222156",
+        "name": "胖哥俩肉蟹煲(钟楼店)",
+        "location": "108.947367,34.257934",
+        "distance": "169.225",
+        "tel": "029-62655977;13032928262",
+        "type": "餐饮服务;中餐厅;中餐厅"
+      },
+      {
+        "id": "B0HA1CH5QH",
+        "direction": "东",
+        "businessarea": "南院门",
+        "address": "开元商场G一层西北角(迪桑特隔壁)",
+        "poiweight": "0.202506",
+        "name": "茶话弄(钟楼开元店)",
+        "location": "108.948769,34.258841",
+        "distance": "172.712",
+        "tel": "18192642617",
+        "type": "餐饮服务;冷饮店;冷饮店"
+      },
+      {
+        "id": "B0KGVKDQAF",
+        "direction": "北",
+        "businessarea": "南院门",
+        "address": "北大街28号新街里钟楼501室",
+        "poiweight": "0.266205",
+        "name": "希美酒店(西安钟鼓楼回民街店)",
+        "location": "108.946467,34.261105",
+        "distance": "193.315",
+        "tel": "029-87222678",
+        "type": "住宿服务;住宿服务相关;住宿服务相关"
+      },
+      {
+        "id": "B0FFI9Z5L2",
+        "direction": "南",
+        "businessarea": "南院门",
+        "address": "南大街59号(钟楼地铁站J口步行300米)",
+        "poiweight": "0.222415",
+        "name": "众汇食代广场",
+        "location": "108.947307,34.257695",
+        "distance": "194.604",
+        "tel": "029-62613300;029-62655988;15202443240",
+        "type": "餐饮服务;中餐厅;综合酒楼"
+      },
+      {
+        "id": "B0LR17TVR9",
+        "direction": "北",
+        "businessarea": "南院门",
+        "address": "北大街1号(钟楼地铁站D口步行190米)",
+        "poiweight": "0.268666",
+        "name": "宿适精选酒店(钟楼地铁站回民街店)",
+        "location": "108.947450,34.260596",
+        "distance": "135.295",
+        "tel": "029-87259988;029-87259988,0",
+        "type": "住宿服务;住宿服务相关;住宿服务相关"
+      }
+    ]
+  },
+  "info": "OK",
+  "infocode": "10000"
+}
