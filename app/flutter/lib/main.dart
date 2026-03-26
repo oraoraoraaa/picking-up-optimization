@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:amap_map/amap_map.dart';
+import 'package:flutter/foundation.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:x_amap_base/x_amap_base.dart';
 
 void main() {
   runApp(const PickupOptimizationApp());
@@ -32,8 +36,53 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  static const CameraPosition _defaultCamera = CameraPosition(
+    target: LatLng(39.909187, 116.397451),
+    zoom: 11.5,
+  );
+  static const AMapApiKey _amapApiKeys = AMapApiKey(
+    androidKey: String.fromEnvironment('AMAP_ANDROID_KEY', defaultValue: ''),
+    iosKey: String.fromEnvironment('AMAP_IOS_KEY', defaultValue: ''),
+  );
+  static const AMapPrivacyStatement _privacyStatement = AMapPrivacyStatement(
+    hasContains: true,
+    hasShow: true,
+    hasAgree: true,
+  );
+
   UserMode _mode = UserMode.driver;
   bool _modeMenuExpanded = false;
+  AMapController? _mapController;
+  bool _centeredOnUser = false;
+  bool _locationReady = false;
+
+  bool get _supportsAmap {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
+  bool get _hasConfiguredApiKey {
+    final android = (_amapApiKeys.androidKey ?? '').trim();
+    final ios = (_amapApiKeys.iosKey ?? '').trim();
+    return android.isNotEmpty || ios.isNotEmpty;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _requestLocationPermission();
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _requestLocationPermission();
+  }
+
+  Future<void> _requestLocationPermission() async {
+    await Permission.locationWhenInUse.request();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,11 +90,16 @@ class _DashboardPageState extends State<DashboardPage> {
         ? "Where's your passenger?"
         : "Where's your driver?";
 
+    if (_supportsAmap) {
+      AMapInitializer.init(context, apiKey: _amapApiKeys);
+      AMapInitializer.updatePrivacyAgree(_privacyStatement);
+    }
+
     return Scaffold(
       body: SafeArea(
         child: Stack(
           children: [
-            Positioned.fill(child: _buildMapPlaceholder()),
+            Positioned.fill(child: _buildMapBackground()),
             Positioned(top: 20, right: 20, child: _buildModeSelector()),
             Positioned(
               left: 14,
@@ -59,56 +113,111 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildMapPlaceholder() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment(-0.8, -1),
-          end: Alignment(0.8, 1),
-          colors: [Color(0xFF0A1A2B), Color(0xFF11253A), Color(0xFF0B1728)],
-        ),
-      ),
-      child: Stack(
+  Widget _buildMapBackground() {
+    if (_supportsAmap && _hasConfiguredApiKey) {
+      return Stack(
         children: [
-          Positioned(
-            top: -120,
-            left: -80,
-            child: _ambientBlob(
-              size: 260,
-              color: const Color(0xFF4ED1C4).withValues(alpha: 0.16),
+          AMapWidget(
+            initialCameraPosition: _defaultCamera,
+            trafficEnabled: true,
+            scaleEnabled: false,
+            compassEnabled: false,
+            myLocationStyleOptions: MyLocationStyleOptions(
+              true,
+              circleFillColor: const Color(0x334BD5FF),
+              circleStrokeColor: const Color(0xFF1D9BD1),
+              circleStrokeWidth: 1,
             ),
+            onMapCreated: (AMapController controller) {
+              _mapController = controller;
+            },
+            onLocationChanged: (AMapLocation location) {
+              final lat = location.latLng.latitude;
+              final lng = location.latLng.longitude;
+              final hasValidLocation =
+                  lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+              if (!hasValidLocation || _mapController == null) {
+                return;
+              }
+
+              if (!_centeredOnUser) {
+                _centeredOnUser = true;
+                _mapController!.moveCamera(
+                  CameraUpdate.newLatLngZoom(location.latLng, 15.5),
+                );
+              }
+
+              if (!_locationReady && mounted) {
+                setState(() {
+                  _locationReady = true;
+                });
+              }
+            },
           ),
-          Positioned(
-            right: -110,
-            bottom: 90,
-            child: _ambientBlob(
-              size: 280,
-              color: const Color(0xFF77A9DF).withValues(alpha: 0.14),
+          if (!_locationReady)
+            Positioned.fill(
+              child: Container(
+                color: const Color(0xFF0A1A2B),
+                alignment: Alignment.center,
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 26,
+                      height: 26,
+                      child: CircularProgressIndicator(strokeWidth: 2.8),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Fetching current location...',
+                      style: TextStyle(color: Color(0xFFE7F8FF), fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          // Light route-like grid to mimic map texture before real map wiring.
-          Positioned.fill(child: CustomPaint(painter: _MapTexturePainter())),
-          const Align(
-            alignment: Alignment(0.0, 0.05),
-            child: Icon(Icons.my_location, color: Color(0xFF6CD4FF), size: 30),
-          ),
         ],
-      ),
+      );
+    }
+
+    return Stack(
+      children: [
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(-0.8, -1),
+              end: Alignment(0.8, 1),
+              colors: [Color(0xFF0A1A2B), Color(0xFF11253A), Color(0xFF0B1728)],
+            ),
+          ),
+        ),
+        Positioned(top: 24, left: 16, right: 16, child: _buildAmapHintCard()),
+      ],
     );
   }
 
-  Widget _ambientBlob({required double size, required Color color}) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, color.withValues(alpha: 0.0)],
-            stops: const [0.0, 1.0],
+  Widget _buildAmapHintCard() {
+    final reason = !_supportsAmap
+        ? 'AMap is available on iOS and Android only.'
+        : 'Missing AMAP API key. Pass keys with --dart-define.';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.map_outlined, color: Color(0xFFBDEEFF), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              reason,
+              style: const TextStyle(color: Color(0xFFE7F8FF), fontSize: 13.5),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -319,33 +428,4 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     );
   }
-}
-
-class _MapTexturePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final major = Paint()
-      ..color = const Color(0xFF9AB0C8).withValues(alpha: 0.25)
-      ..strokeWidth = 1.2;
-    final minor = Paint()
-      ..color = const Color(0xFF9AB0C8).withValues(alpha: 0.14)
-      ..strokeWidth = 0.8;
-
-    for (double x = 0; x < size.width; x += 64) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), minor);
-    }
-    for (double y = 0; y < size.height; y += 54) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), minor);
-    }
-
-    for (double x = 30; x < size.width; x += 138) {
-      canvas.drawLine(Offset(x, 0), Offset(x + 40, size.height), major);
-    }
-    for (double y = 36; y < size.height; y += 118) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y + 30), major);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

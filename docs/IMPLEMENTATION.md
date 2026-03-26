@@ -62,4 +62,70 @@ Notes:
 - The search behavior is intentionally left as UI-only placeholder for now.
 - The map is currently a visual placeholder layer to ensure the dashboard is displayable immediately.
 - Next step is to replace the placeholder map with real `amap_map` integration and wire GPS/search interactions.
+
+### Implementation Update (2026-03-26, AMap Integration)
+
+Integrated `amap_map` into the dashboard so the app can render a real interactive map as the background and display the user's live location.
+
+Files modified:
+
+- `app/flutter/pubspec.yaml`
+- `app/flutter/lib/main.dart`
+- `app/flutter/android/app/src/main/AndroidManifest.xml`
+- `app/flutter/ios/Runner/Info.plist`
+- `app/flutter/ios/Podfile`
+
+Completed items:
+
+- Added dependencies:
+  - `amap_map`
+  - `x_amap_base`
+  - `permission_handler`
+- Replaced the custom-painted placeholder map layer in `DashboardPage` with `AMapWidget`.
+- Added AMap SDK initialization and privacy agreement update:
+  - `AMapInitializer.init(context, apiKey: ...)`
+  - `AMapInitializer.updatePrivacyAgree(...)`
+- Added map my-location visualization using `MyLocationStyleOptions(true, ...)`.
+- Added `onLocationChanged` behavior to move camera to the first detected user location.
+- Added Android permissions and compatibility flag for AMap runtime:
+  - `ACCESS_COARSE_LOCATION`
+  - `ACCESS_FINE_LOCATION`
+  - `INTERNET`
+  - `ACCESS_NETWORK_STATE`
+  - `android:allowNativeHeapPointerTagging="false"`
+- Added iOS location usage descriptions and ATS allowance in `Info.plist`.
+- Added iOS `permission_handler` location compile flag in `Podfile`:
+  - `PERMISSION_LOCATION=1`
+
+API key configuration:
+
+- AMap keys are currently injected through build-time defines:
+  - `AMAP_ANDROID_KEY`
+  - `AMAP_IOS_KEY`
+- Example run pattern:
+
+```bash
+export AMAP_ANDROID_KEY="<your_android_key>"
+export AMAP_IOS_KEY="<your_ios_key>"
+flutter run \
+  --dart-define=AMAP_ANDROID_KEY=$AMAP_ANDROID_KEY \
+  --dart-define=AMAP_IOS_KEY=$AMAP_IOS_KEY
+```
+
+Notes:
+
+- If keys are not provided (or app runs on unsupported platforms like web/desktop), dashboard falls back to a non-interactive gradient background with a setup hint card.
+- Current location permission is requested via `permission_handler` (`locationWhenInUse`).
+
+### Implementation Update (2026-03-26, Location-first Camera Focus)
+
+Adjusted dashboard map behavior so camera focus procedure is strictly location-first:
+
+- The map now stays behind a loading layer (`Fetching current location...`) until the first valid location callback is received.
+- Once the first valid location is fetched, camera focus moves to user location via `CameraUpdate.newLatLngZoom(...)`.
+- Only after that first focus update does the loading layer disappear.
+
+Result:
+
+- The user no longer sees the initial Beijing camera position before recentering.
   
