@@ -12,7 +12,7 @@ Store documentation assets that are referenced by markdown or technical docs in 
 
 Use this pattern for every file:
 
-<project>-<doc-topic>-<asset-type>-v<major>.<ext>
+<project>_<doc_topic>_<asset_type>_v<major>.<ext>
 
 Rules:
 
@@ -24,5 +24,5 @@ Rules:
 
 Examples:
 
-- pickup-op-routing-diagram-v1.svg
-- pickup-op-setup-screenshot-v3.png
+- pickup_op_routing_diagram_v1.svg
+- pickup_op_setup_screenshot_v3.png

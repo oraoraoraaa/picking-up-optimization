@@ -2,7 +2,7 @@
 
 A tool for optimizing the process of a driver picking up a passenger.
 
-![dashboard_v1](resource/images/design/pickup-op-dashboard-v1.png)
+![dashboard_v1](resource/images/design/pickup_op_dashboard_v1.png)
 
 ## Problem
 

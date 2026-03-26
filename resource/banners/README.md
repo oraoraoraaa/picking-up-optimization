@@ -12,7 +12,7 @@ Store banner assets for docs, web pages, and promotional content in this folder.
 
 Use this pattern for every file:
 
-<project>-<feature>-<variant>-v<major>.<ext>
+<project>_<feature>_<variant>_v<major>.<ext>
 
 Rules:
 
@@ -24,5 +24,5 @@ Rules:
 
 Examples:
 
-- pickup-op-home-hero-v1.png
-- pickup-op-release-header-v2.webp
+- pickup_op_home_hero_v1.png
+- pickup_op_release_header_v2.webp

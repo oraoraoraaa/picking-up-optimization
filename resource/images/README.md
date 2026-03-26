@@ -12,7 +12,7 @@ Store general image assets that do not belong in banners or icons.
 
 Use this pattern for every file:
 
-<project>-<subject>-<variant>-v<major>.<ext>
+<project>_<subject>_<variant>_v<major>.<ext>
 
 Rules:
 
@@ -24,5 +24,5 @@ Rules:
 
 Examples:
 
-- pickup-op-dashboard-overview-v1.png
-- pickup-op-route-preview-mobile-v2.jpg
+- pickup_op_dashboard_overview_v1.png
+- pickup_op_route_preview_mobile_v2.jpg

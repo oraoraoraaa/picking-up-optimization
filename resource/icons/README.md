@@ -12,7 +12,7 @@ Store icon assets used by applications, documentation, and branding in this fold
 
 Use this pattern for every file:
 
-<project>-<icon-name>-<size-or-platform>-v<major>.<ext>
+<project>_<icon_name>_<size_or_platform>_v<major>.<ext>
 
 Rules:
 
@@ -24,5 +24,5 @@ Rules:
 
 Examples:
 
-- pickup-op-navigation-24px-v1.svg
-- pickup-op-notification-android-v2.png
+- pickup_op_navigation_24px_v1.svg
+- pickup_op_notification_android_v2.png
