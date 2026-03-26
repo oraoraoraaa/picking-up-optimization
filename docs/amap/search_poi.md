@@ -6,7 +6,9 @@
 >
 > For querying adcode or city code, see [`docs/amap/adcode_citycode.csv`](adcode_citycode.csv).
 >
-> For querying poi categories or poi code, see [`docs/amap/poi_code.csv`](poi_code.csv).
+> For querying poi categories encoding, see [`docs/amap/poi_categories_encoding.csv`](poi_categories_encoding.csv).
+>
+> For querying poi id (the unique identifier of a poi), use keyword search API and resolve the `pois.poi.id` field. See [`docs/amap/search_poi.md#searching-with-keyword`](search_poi.md#searching-with-keyword).
 
 Caution! This documentation is truncated as some functions are not necessary in this project.
 
@@ -35,9 +37,9 @@ For querying adcode or city code, see [`docs/amap/adcode_citycode.csv`](adcode_c
 - 多边形搜索：在多边形区域内进行搜索
 - ID 查询：通过 POI ID，查询某个 POI 详情，建议可同输入提示 API 配合使用
 
-## Searching with Keywords
+## Searching with Keyword
 
-### Searching with Keywords: Request
+### Searching with Keyword: Request
 
 - URL: `https://restapi.amap.com/v3/place/text?parameters`
 - 请求方式：GET
@@ -66,7 +68,7 @@ https://restapi.amap.com/v3/place/text?keywords=西安钟楼&city=xian&offset=20
 
 Return value: See [`docs/amap/search_keyword.json`](search_keyword.json).
 
-### Searching with Keywords: Return Explanation
+### Searching with Keyword: Return Explanation
 
 | 名称          | 含义                     | 规则说明                                                                                     |
 |---------------|--------------------------|----------------------------------------------------------------------------------------------|

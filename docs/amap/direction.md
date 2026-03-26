@@ -6,7 +6,9 @@
 >
 > For querying adcode or city code, see [`docs/amap/adcode_citycode.csv`](adcode_citycode.csv).
 >
-> For querying poi categories or poi code, see [`docs/amap/poi_code.csv`](poi_code.csv).
+> For querying poi categories encoding, see [`docs/amap/poi_categories_encoding.csv`](poi_categories_encoding.csv).
+>
+> For querying poi id (the unique identifier of a poi), use keyword search API and resolve the `pois.poi.id` field. See [`docs/amap/search_poi.md#searching-with-keyword`](search_poi.md#searching-with-keyword).
 
 ## Walking
 
