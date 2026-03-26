@@ -2,6 +2,8 @@
 
 A tool for optimizing the process of a driver picking up a passenger.
 
+![dashboard_v1](resource/images/design/pickup-op-dashboard-v1.png)
+
 ## Problem
 
 When a driver is on the way to pick someone up, the initially selected pickup point is not always the fastest option. Traffic conditions can change at any time across the route, and simply sticking to one fixed point can waste time for both parties.
