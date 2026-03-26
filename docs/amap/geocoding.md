@@ -3,10 +3,14 @@
 > This document is mostly copied from the webpage: `https://lbs.amap.com/api/webservice/guide/api/direction/`.
 >
 > For more detailed information, visit the website.
+>
+> For querying adcode or city code, see [`docs/amap/adcode_citycode.csv`](adcode_citycode.csv).
+>
+> For querying poi categories or poi code, see [`docs/amap/poi_code.csv`](poi_code.csv).
 
 ## Geocoding
 
-### Request
+### Geocoding: Request
 
 - URL: `https://restapi.amap.com/v3/geocode/geo?parameters`
 - 请求方式：GET
@@ -22,9 +26,7 @@
 | output   | 返回数据格式类型   | 可选输入内容包括：JSON，XML。设置 JSON 返回结果数据将会以 JSON 结构构成；如果设置 XML 返回结果数据将以 XML 结构构成。 | 可选     | JSON                   |
 | callback | 回调函数           | callback 值是用户定义的函数名称，此参数只在 output 参数设置为 JSON 时有效。                                       | 可选     | 无                     |
 
-For querying city code, see [`docs/amap/adcode_citycode.csv`](adcode_citycode.csv).
-
-### Example
+### Geocoding: Example
 
 ```sh
 https://restapi.amap.com/v3/geocode/geo?output=json&address=陕西省西安市新城区西安钟楼&key=<YOUR_KEY>
@@ -32,7 +34,7 @@ https://restapi.amap.com/v3/geocode/geo?output=json&address=陕西省西安市�
 
 Return value: See [`docs/amap/geocoding.json`](geocoding.json).
 
-### Return Explanation
+### Geocoding: Return Explanation
 
 | 名称      | 含义               | 规则说明                                                                                     |
 | --------- | ------------------ | -------------------------------------------------------------------------------------------- |
@@ -55,7 +57,7 @@ Return value: See [`docs/amap/geocoding.json`](geocoding.json).
 
 ## Reverse Geocoding
 
-### Request
+### Reverse Geocoding: Request
 
 - URL: `https://restapi.amap.com/v3/geocode/regeo?parameters`
 - 请求方式：GET
@@ -75,7 +77,7 @@ Return value: See [`docs/amap/geocoding.json`](geocoding.json).
 | callback   | 回调函数             | callback 值是用户定义的函数名称，此参数只在 output 参数设置为 JSON 时有效。                                                                                                                               | 可选     | 无     |
 | homecorpor | 是否优化 POI 返回顺序 | 以下内容需要 extensions 参数为 all 时才生效。homecorpor 参数的设置可以影响召回 POI 内容的排序策略，目前提供三个可选参数：0：不对召回的排序策略进行干扰。1：综合大数据分析将居家相关的 POI 内容优先返回，即优化返回结果中 pois 字段的poi 顺序。2：综合大数据分析将公司相关的 POI 内容优先返回，即优化返回结果中 pois 字段的poi 顺序。 | 可选     | 0      |
 
-### Example
+### Reverse Geocoding: Example
 
 ```sh
 https://restapi.amap.com/v3/geocode/regeo?output=json&location=108.94703,34.25943&radius=1000&extensions=all&key=<YOUR_KEY>
@@ -83,7 +85,7 @@ https://restapi.amap.com/v3/geocode/regeo?output=json&location=108.94703,34.2594
 
 Return value: See [`docs/amap/geocoding_reverse.json`](geocoding_reverse.json).
 
-### Return Explanation
+### Reverse Geocoding: Return Explanation
 
 | 名称                | 含义                     | 规则说明                                                                                                                                 |
 | ------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |

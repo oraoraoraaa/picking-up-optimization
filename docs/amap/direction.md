@@ -3,12 +3,16 @@
 > This document is mostly copied from the webpage: `https://lbs.amap.com/api/webservice/guide/api/direction/`.
 >
 > For more detailed information, visit the website.
+>
+> For querying adcode or city code, see [`docs/amap/adcode_citycode.csv`](adcode_citycode.csv).
+>
+> For querying poi categories or poi code, see [`docs/amap/poi_code.csv`](poi_code.csv).
 
 ## Walking
 
 步行路径规划 API 可以规划100km 以内的步行通勤方案，并且返回通勤方案的数据。最大支持 100km 的步行路线规划。
 
-### Request
+### Walking: Request
 
 - URL: `https://restapi.amap.com/v3/direction/walking?parameters`
 - 请求方式：GET
@@ -26,15 +30,15 @@
 | output        | 返回数据格式类型     | 可选值：JSON，XML                                                                            | 可选     | JSON   |
 | callback      | 回调函数             | callback值是用户定义的函数名称，此参数只在output=JSON时有效                                   | 可选     | 无     |
 
-### Example
+### Walking: Example
 
 ```sh
-https://restapi.amap.com/v3/geocode/geo?address=陕西省西安市新城区西安钟楼&output=JSON&key=<YOUR_KEY>
+https://restapi.amap.com/v3/direction/walking?output=json&origin=108.983741,34.246233&destination=108.94703,34.25943&key=<YOUR_KEY>
 ```
 
-Return value: See [`docs/amap/geocoding.json`](geocoding.json).
+Return value: See [`docs/amap/direction_walking.json`](direction_walking.json).
 
-### Return Explanation
+### Walking: Return Explanation
 
 | 名称            | 含义                 | 规则说明                                                                 |
 |-----------------|----------------------|--------------------------------------------------------------------------|
@@ -86,7 +90,7 @@ Return value: See [`docs/amap/geocoding.json`](geocoding.json).
 
 公交路径规划 API 可以规划综合各类公共（火车、公交、地铁）交通方式的通勤方案，并且返回通勤方案的数据。
 
-### Request
+### Transit: Request
 
 - URL: `https://restapi.amap.com/v3/direction/transit/integrated?parameters`
 - 请求方式：GET
@@ -109,9 +113,7 @@ Return value: See [`docs/amap/geocoding.json`](geocoding.json).
 | output      | 返回数据格式类型                   | 可选值：JSON，XML                                                                                          | 可选           | JSON   |
 | callback    | 回调函数                           | callback值是用户定义的函数名称，此参数只在output=JSON时有效                                                 | 可选           | 无     |
 
-For querying city code, see [`docs/amap/adcode_citycode.csv`](adcode_citycode.csv).
-
-### Example
+### Transit: Example
 
 ```sh
 https://restapi.amap.com/v3/direction/transit/integrated?output=json&origin=108.983741,34.246233&destination=108.94703,34.25943&city=029&key=<YOUR_KEY>
@@ -119,7 +121,7 @@ https://restapi.amap.com/v3/direction/transit/integrated?output=json&origin=108.
 
 Return value: See [`docs/amap/direction_transit.json`](direction_transit.json).
 
-### Return Explanation
+### Transit: Return Explanation
 
 | 名称            | 含义                 | 规则说明                                                                 |
 |-----------------|----------------------|--------------------------------------------------------------------------|
@@ -271,7 +273,7 @@ Return value: See [`docs/amap/direction_transit.json`](direction_transit.json).
 
 驾车路径规划 API 可以规划以小客车、轿车通勤出行的方案，并且返回通勤方案的数据。
 
-### Request
+### Driving: Request
 
 - URL: `https://restapi.amap.com/v3/direction/driving?parameters`
 - 请求方式：GET
@@ -300,7 +302,7 @@ Return value: See [`docs/amap/direction_transit.json`](direction_transit.json).
 | callback | 回调函数 | callback 值是用户定义的函数名称，此参数只在 output=JSON 时有效 | 否 | 无 |
 | extensions | 返回结果控制 | 可选值：base/all<br>base:返回基本信息；all: 返回全部信息 | 是 | base |
 
-### Example
+### Driving: Example
 
 ```sh
 https://restapi.amap.com/v3/direction/driving?output=json&extensions=all&origin=108.983741,34.246233&destination=108.94703,34.25943&key=<YOUR_KEY>
@@ -308,7 +310,7 @@ https://restapi.amap.com/v3/direction/driving?output=json&extensions=all&origin=
 
 Return value: See [`docs/amap/direction_driving.json`](direction_driving.json).
 
-### Return Explanation
+### Driving: Return Explanation
 
 | 名称 | 含义 | 规则说明 |
 | --- | --- | --- |
@@ -434,7 +436,7 @@ Return value: See [`docs/amap/direction_driving.json`](direction_driving.json).
 
 骑行路径规划用于规划骑行通勤方案，规划时会考虑天桥、单行线、封路等情况。最大支持 500km 的骑行路线规划。
 
-### Request
+### Cycling: Request
 
 - URL: `https://restapi.amap.com/v4/direction/bicycling?parameters`
 - 请求方式：GET
@@ -447,7 +449,7 @@ Return value: See [`docs/amap/direction_driving.json`](direction_driving.json).
 | origin | 出发点经纬度 | 填入规则：X,Y，采用","分隔，例如 "117.500244, 40.417801" <br> 小数点后不得超过6位 | 是 | 无 |
 | destination | 目的地经纬度 | 填入规则：X,Y，采用","分隔，例如 "117.500244, 40.417801" <br> 小数点后不得超过6位 | 是 | 无 |
 
-### Example
+### Cycling: Example
 
 ```sh
 https://restapi.amap.com/v4/direction/bicycling?output=json&origin=108.983741,34.246233&destination=108.94703,34.25943&key=<YOUR_KEY>
@@ -455,7 +457,7 @@ https://restapi.amap.com/v4/direction/bicycling?output=json&origin=108.983741,34
 
 Return value: See [`docs/amap/direction_cycling.json`](direction_cycling.json).
 
-### Return Explanation
+### Cycling: Return Explanation
 
 | 名称 | 类型 | 含义 | 规则说明 |
 | --- | --- | --- | --- |
@@ -480,7 +482,7 @@ Return value: See [`docs/amap/direction_cycling.json`](direction_cycling.json).
 
 ## Distance Measurement
 
-### Request
+### Distance Measurement: Request
 
 - URL: `https://restapi.amap.com/v3/distance?parameters`
 - 请求方式：GET
@@ -497,7 +499,7 @@ Return value: See [`docs/amap/direction_cycling.json`](direction_cycling.json).
 | output | 返回数据格式类型 | 可选值：JSON，XML | 可选 | JSON |
 | callback | 回调函数 | callback 值是用户定义的函数名称，此参数只在 output=JSON 时有效 | 可选 | 无 |
 
-### Example
+### Distance Measurement: Example
 
 ```sh
 https://restapi.amap.com/v3/distance?type=1&origins=108.983741,34.246233&destination`=108.94703,34.25943&key=<YOUR_KEY>
@@ -505,7 +507,7 @@ https://restapi.amap.com/v3/distance?type=1&origins=108.983741,34.246233&destina
 
 Return value: See [`docs/amap/direction_measurement.json`](direction_measurement.json).
 
-### Return Explanation
+### Distance Measurement: Return Explanation
 
 | 名称 | 说明 |
 | --- | --- |

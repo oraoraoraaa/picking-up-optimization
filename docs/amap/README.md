@@ -10,3 +10,5 @@ Whenever you add new documents, please update the table of contents below.
 
 - [Route Planning API Guide](direction.md): Instructions for using the route planning API
 - [Geocoding API Guide](geocoding.md): Instructions for geocoding and reverse geocoding APIs
+- [Static Map API Guide](static_map.md): Instructions for using the static map API
+- [Search POI API GUIDE](search_poi.md): Instructions for multiple searching APIs
