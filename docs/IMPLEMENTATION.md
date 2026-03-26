@@ -128,4 +128,100 @@ Adjusted dashboard map behavior so camera focus procedure is strictly location-f
 Result:
 
 - The user no longer sees the initial Beijing camera position before recentering.
+
+### Implementation Update (2026-03-26, POI Search Suggestions and Selection)
+
+Implemented interactive place search on both dashboard search bars with AMap suggestion APIs and map selection behavior.
+
+Files modified:
+
+- `app/flutter/lib/main.dart`
+- `app/flutter/pubspec.yaml`
+
+Completed items:
+
+- Added `http` dependency for calling AMap Web Service APIs.
+- Added two real input fields for the existing dashboard search bars:
+  - Pickup target search (`Where's your passenger?` / `Where's your driver?`)
+  - Alternate start point search (`Starting from a different location?`)
+- Added debounced live search while typing:
+  - Primary source: AMap Input Tips API (`/v3/assistant/inputtips`, `datatype=poi`)
+  - Fallback source: AMap POI keyword search API (`/v3/place/text`)
+- Added suggestion dropdown UI with consistent glass/teal visual style:
+  - Loading state
+  - Empty state
+  - Error state
+  - Tap-to-select list items showing name + address/district
+- Added selection behavior:
+  - Filling the tapped location into the corresponding input field
+  - Closing suggestion panel
+  - Moving map camera to selected location
+  - Showing selected locations as markers on the AMap layer
+- Added nearby-priority suggestion behavior by sending current user location to Input Tips when available.
+
+API key behavior:
+
+- Search requests use a dedicated build-time define first:
+  - `AMAP_WEB_KEY`
+- Fallback behavior when `AMAP_WEB_KEY` is missing:
+  - Android uses `AMAP_ANDROID_KEY`
+  - iOS uses `AMAP_IOS_KEY`
+
+Recommended run pattern:
+
+```bash
+export AMAP_ANDROID_KEY="<your_android_key>"
+export AMAP_IOS_KEY="<your_ios_key>"
+export AMAP_WEB_KEY="<your_web_service_key>"
+flutter run \
+  --dart-define=AMAP_ANDROID_KEY=$AMAP_ANDROID_KEY \
+  --dart-define=AMAP_IOS_KEY=$AMAP_IOS_KEY \
+  --dart-define=AMAP_WEB_KEY=$AMAP_WEB_KEY
+```
+
+Notes:
+
+- `amap_map` itself does not provide built-in POI autocomplete/search methods in `AMapController`, so search suggestions are implemented through AMap Web Service APIs.
+- If no valid search key is configured, the suggestion panel displays a setup hint.
+
+### Implementation Update (2026-03-27, Keyboard Dismissal & Interactive Map POI Selection)
+
+Enhanced UX with keyboard dismissal and interactive map-based location selection.
+
+Files modified:
+
+- `app/flutter/lib/main.dart`
+
+Completed items:
+
+**Keyboard Dismissal:**
+- Wrapped the main dashboard `Stack` in a `GestureDetector` with `onTap` handler.
+- Calls `FocusScope.of(context).unfocus()` to dismiss keyboard when user taps outside search inputs.
+- Result: Keyboard closes automatically when clicking on map or other UI elements.
+
+**Interactive Map POI Selection:**
+- Enabled POI tap detection on `AMapWidget`:
+  - Set `touchPoiEnabled: true` to allow POI tapping.
+  - Registered `onPoiTouched` callback to capture tapped locations.
+- Implemented map POI tap handler (`_onMapPoiTapped`):
+  - Dismisses keyboard via `FocusScope.unfocus()`.
+  - Triggers bottom sheet modal.
+- Created context-aware bottom sheet (`_showPoiSelectionBottomSheet`):
+  - Displays POI name as header.
+  - Shows two mode-specific action buttons:
+    - **Driver Mode**: "My passenger is here" (set as pickup) + "I'll go from here" (set as start).
+    - **Passenger Mode**: "My driver is here" (set as pickup) + "I'm here" (set as start).
+  - Buttons close bottom sheet after selection and trigger marker refresh.
+- Added POI selection handlers (`_setPickupFromPoi`, `_setStartFromPoi`):
+  - Creates `_PoiSuggestion` object from tap coordinates (using POI name, id, latLng).
+  - Updates corresponding controller text (pickup/start input field).
+  - Refreshes map markers to show selected location.
+  - Clears active search field state.
+
+Technical Notes:
+
+- `AMapPoi` class from `amap_map` package contains only: `name`, `id`, `latLng` properties.
+- No address/district information is available from map POI taps, so these fields are set to empty strings in the selection model.
+- If address information is needed from map taps, a reverse geocoding API call would be required (separate implementation).
+- Bottom sheet only displays POI name without subtitle (address unavailable).
   

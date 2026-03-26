@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:amap_map/amap_map.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 
@@ -28,6 +31,29 @@ class PickupOptimizationApp extends StatelessWidget {
 
 enum UserMode { driver, passenger }
 
+enum _SearchField { pickup, start }
+
+class _PoiSuggestion {
+  const _PoiSuggestion({
+    required this.id,
+    required this.name,
+    required this.address,
+    required this.latLng,
+    required this.district,
+  });
+
+  final String id;
+  final String name;
+  final String address;
+  final LatLng latLng;
+  final String district;
+
+  String get subtitle {
+    if (address.trim().isNotEmpty) return address;
+    return district;
+  }
+}
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -49,12 +75,30 @@ class _DashboardPageState extends State<DashboardPage> {
     hasShow: true,
     hasAgree: true,
   );
+  static const String _amapWebKey = String.fromEnvironment(
+    'AMAP_WEB_KEY',
+    defaultValue: '',
+  );
 
   UserMode _mode = UserMode.driver;
   bool _modeMenuExpanded = false;
   AMapController? _mapController;
   bool _centeredOnUser = false;
   bool _locationReady = false;
+  LatLng? _latestUserLocation;
+  final TextEditingController _pickupController = TextEditingController();
+  final TextEditingController _startController = TextEditingController();
+  final FocusNode _pickupFocusNode = FocusNode();
+  final FocusNode _startFocusNode = FocusNode();
+  _SearchField? _activeSearchField;
+  bool _isSearching = false;
+  String? _searchError;
+  List<_PoiSuggestion> _suggestions = const <_PoiSuggestion>[];
+  _PoiSuggestion? _pickupSelection;
+  _PoiSuggestion? _startSelection;
+  int _searchRequestToken = 0;
+  Timer? _searchDebounce;
+  Set<Marker> _selectedMarkers = <Marker>{};
 
   bool get _supportsAmap {
     if (kIsWeb) return false;
@@ -68,10 +112,39 @@ class _DashboardPageState extends State<DashboardPage> {
     return android.isNotEmpty || ios.isNotEmpty;
   }
 
+  String get _effectiveSearchKey {
+    final web = _amapWebKey.trim();
+    if (web.isNotEmpty) return web;
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return (_amapApiKeys.androidKey ?? '').trim();
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return (_amapApiKeys.iosKey ?? '').trim();
+    }
+
+    return '';
+  }
+
   @override
   void initState() {
     super.initState();
     _requestLocationPermission();
+    _pickupFocusNode.addListener(() {
+      if (_pickupFocusNode.hasFocus) {
+        setState(() {
+          _activeSearchField = _SearchField.pickup;
+        });
+      }
+    });
+    _startFocusNode.addListener(() {
+      if (_startFocusNode.hasFocus) {
+        setState(() {
+          _activeSearchField = _SearchField.start;
+        });
+      }
+    });
   }
 
   @override
@@ -82,6 +155,16 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _requestLocationPermission() async {
     await Permission.locationWhenInUse.request();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _pickupController.dispose();
+    _startController.dispose();
+    _pickupFocusNode.dispose();
+    _startFocusNode.dispose();
+    super.dispose();
   }
 
   @override
@@ -97,17 +180,20 @@ class _DashboardPageState extends State<DashboardPage> {
 
     return Scaffold(
       body: SafeArea(
-        child: Stack(
-          children: [
-            Positioned.fill(child: _buildMapBackground()),
-            Positioned(top: 20, right: 20, child: _buildModeSelector()),
-            Positioned(
-              left: 14,
-              right: 14,
-              bottom: 16,
-              child: _buildBottomPanel(prompt),
-            ),
-          ],
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Stack(
+            children: [
+              Positioned.fill(child: _buildMapBackground()),
+              Positioned(top: 20, right: 20, child: _buildModeSelector()),
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 16,
+                child: _buildBottomPanel(prompt),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -122,6 +208,8 @@ class _DashboardPageState extends State<DashboardPage> {
             trafficEnabled: true,
             scaleEnabled: false,
             compassEnabled: false,
+            markers: _selectedMarkers,
+            touchPoiEnabled: true,
             myLocationStyleOptions: MyLocationStyleOptions(
               true,
               circleFillColor: const Color(0x334BD5FF),
@@ -131,6 +219,9 @@ class _DashboardPageState extends State<DashboardPage> {
             onMapCreated: (AMapController controller) {
               _mapController = controller;
             },
+            onPoiTouched: (AMapPoi poi) {
+              _onMapPoiTapped(poi);
+            },
             onLocationChanged: (AMapLocation location) {
               final lat = location.latLng.latitude;
               final lng = location.latLng.longitude;
@@ -139,6 +230,8 @@ class _DashboardPageState extends State<DashboardPage> {
               if (!hasValidLocation || _mapController == null) {
                 return;
               }
+
+              _latestUserLocation = location.latLng;
 
               if (!_centeredOnUser) {
                 _centeredOnUser = true;
@@ -273,6 +366,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _mode = value;
           _modeMenuExpanded = false;
         });
+        _clearAllLocations();
       },
       borderRadius: BorderRadius.circular(14),
       child: Container(
@@ -327,14 +421,24 @@ class _DashboardPageState extends State<DashboardPage> {
             style: const TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
           ),
           const SizedBox(height: 8),
-          _searchBar(),
+          _searchBar(
+            controller: _pickupController,
+            focusNode: _pickupFocusNode,
+            hint: 'Search for a place or address',
+            field: _SearchField.pickup,
+          ),
           const SizedBox(height: 7),
           const Text(
             'Starting from a different location?',
             style: TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
           ),
           const SizedBox(height: 8),
-          _searchBar(),
+          _searchBar(
+            controller: _startController,
+            focusNode: _startFocusNode,
+            hint: 'Search your start point',
+            field: _SearchField.start,
+          ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -363,26 +467,725 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _searchBar() {
+  Widget _searchBar({
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required String hint,
+    required _SearchField field,
+  }) {
+    final showSuggestions = _activeSearchField == field;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 46,
+          decoration: BoxDecoration(
+            color: const Color(0xFF58BFB7).withValues(alpha: 0.93),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.search, color: Color(0xFFE9FFF8), size: 27),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  onChanged: (String value) => _onSearchChanged(field, value),
+                  style: const TextStyle(
+                    color: Color(0xFFE9FFF8),
+                    fontSize: 16.5,
+                  ),
+                  cursorColor: const Color(0xFFE9FFF8),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    hintText: hint,
+                    hintStyle: const TextStyle(
+                      color: Color(0xD8E9FFF8),
+                      fontSize: 16.0,
+                    ),
+                  ),
+                ),
+              ),
+              if (_isSearching && showSuggestions)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFFE9FFF8),
+                  ),
+                )
+              else if (controller.text.trim().isNotEmpty)
+                IconButton(
+                  onPressed: () => _clearSearch(field),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: Color(0xFFE9FFF8),
+                    size: 21,
+                  ),
+                  splashRadius: 18,
+                ),
+            ],
+          ),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: showSuggestions
+              ? _buildSuggestionPanel(field, controller.text.trim())
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSuggestionPanel(_SearchField field, String query) {
+    if (query.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    if (_searchError != null && !_isSearching) {
+      return _suggestionMessage(icon: Icons.info_outline, text: _searchError!);
+    }
+
+    if (_isSearching && _suggestions.isEmpty) {
+      return _suggestionMessage(
+        icon: Icons.manage_search,
+        text: 'Searching nearby places...',
+      );
+    }
+
+    if (!_isSearching && _suggestions.isEmpty) {
+      return _suggestionMessage(
+        icon: Icons.location_searching,
+        text: 'No matching places found.',
+      );
+    }
+
     return Container(
-      height: 44,
+      margin: const EdgeInsets.only(top: 7),
+      constraints: const BoxConstraints(maxHeight: 194),
       decoration: BoxDecoration(
-        color: const Color(0xFF58BFB7).withValues(alpha: 0.93),
-        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xC72B5A5B),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: const Row(
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: _suggestions.length,
+        separatorBuilder: (BuildContext _, int index) =>
+            Divider(color: Colors.white.withValues(alpha: 0.14), height: 0.5),
+        itemBuilder: (BuildContext context, int index) {
+          final suggestion = _suggestions[index];
+          return InkWell(
+            onTap: () => _onSuggestionSelected(field, suggestion),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 1),
+                    child: Icon(
+                      Icons.place_outlined,
+                      color: Color(0xFFCBF6EE),
+                      size: 19,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          suggestion.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFEFFFF8),
+                            fontSize: 14.8,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          suggestion.subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFD2F2EA),
+                            fontSize: 12.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _suggestionMessage({required IconData icon, required String text}) {
+    return Container(
+      margin: const EdgeInsets.only(top: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xC72B5A5B),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
         children: [
-          Icon(Icons.search, color: Color(0xFFE9FFF8), size: 28),
-          SizedBox(width: 10),
-          Text(
-            'Search for a place or address',
-            style: TextStyle(color: Color(0xFFE9FFF8), fontSize: 16.5),
+          Icon(icon, color: const Color(0xFFCBF6EE), size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: Color(0xFFD2F2EA), fontSize: 12.8),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  void _clearSearch(_SearchField field) {
+    if (field == _SearchField.pickup) {
+      _pickupController.clear();
+      _pickupSelection = null;
+    } else {
+      _startController.clear();
+      _startSelection = null;
+    }
+
+    _searchDebounce?.cancel();
+    setState(() {
+      _isSearching = false;
+      _searchError = null;
+      _suggestions = const <_PoiSuggestion>[];
+    });
+
+    _refreshMarkers();
+  }
+
+  void _clearAllLocations() {
+    _pickupController.clear();
+    _startController.clear();
+    _pickupSelection = null;
+    _startSelection = null;
+
+    _searchDebounce?.cancel();
+    setState(() {
+      _activeSearchField = null;
+      _isSearching = false;
+      _searchError = null;
+      _suggestions = const <_PoiSuggestion>[];
+    });
+
+    _refreshMarkers();
+  }
+
+  void _onSearchChanged(_SearchField field, String rawValue) {
+    final query = rawValue.trim();
+    if (_activeSearchField != field) {
+      setState(() {
+        _activeSearchField = field;
+      });
+    }
+
+    if (query.isEmpty) {
+      _searchDebounce?.cancel();
+      setState(() {
+        _searchError = null;
+        _isSearching = false;
+        _suggestions = const <_PoiSuggestion>[];
+      });
+      return;
+    }
+
+    _searchDebounce?.cancel();
+    setState(() {
+      _searchError = null;
+      _isSearching = true;
+    });
+
+    _searchDebounce = Timer(const Duration(milliseconds: 320), () {
+      _searchPoiSuggestions(field, query);
+    });
+  }
+
+  Future<void> _searchPoiSuggestions(_SearchField field, String query) async {
+    final key = _effectiveSearchKey;
+    if (key.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _isSearching = false;
+        _searchError =
+            'Missing AMAP_WEB_KEY. Please configure a Web Service key.';
+        _suggestions = const <_PoiSuggestion>[];
+      });
+      return;
+    }
+
+    final requestToken = ++_searchRequestToken;
+    try {
+      final tips = await _fetchFromInputTips(query: query, key: key);
+      final merged = tips.isNotEmpty
+          ? tips
+          : await _fetchFromKeywordSearch(query: query, key: key);
+
+      if (!mounted || requestToken != _searchRequestToken) return;
+      setState(() {
+        _searchError = null;
+        _suggestions = merged;
+        _isSearching = false;
+      });
+    } catch (_) {
+      if (!mounted || requestToken != _searchRequestToken) return;
+      setState(() {
+        _isSearching = false;
+        _suggestions = const <_PoiSuggestion>[];
+        _searchError =
+            'Search failed. Please check your network and key settings.';
+      });
+    }
+  }
+
+  Future<List<_PoiSuggestion>> _fetchFromInputTips({
+    required String query,
+    required String key,
+  }) async {
+    final params = <String, String>{
+      'key': key,
+      'keywords': query,
+      'datatype': 'poi',
+      'output': 'JSON',
+    };
+
+    final location = _latestUserLocation;
+    if (location != null) {
+      params['location'] =
+          '${location.longitude.toStringAsFixed(6)},${location.latitude.toStringAsFixed(6)}';
+    }
+
+    final uri = Uri.https(
+      'restapi.amap.com',
+      '/v3/assistant/inputtips',
+      params,
+    );
+    final response = await http.get(uri).timeout(const Duration(seconds: 8));
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if ('${data['status']}' != '1') {
+      throw StateError('${data['info'] ?? 'AMap request failed'}');
+    }
+
+    final tips = (data['tips'] as List<dynamic>? ?? const <dynamic>[])
+        .cast<Map<String, dynamic>>();
+
+    final results = <_PoiSuggestion>[];
+    for (final item in tips) {
+      final parsed = _parseSuggestionFromTip(item);
+      if (parsed != null) {
+        results.add(parsed);
+      }
+    }
+
+    return results.take(10).toList(growable: false);
+  }
+
+  Future<List<_PoiSuggestion>> _fetchFromKeywordSearch({
+    required String query,
+    required String key,
+  }) async {
+    final params = <String, String>{
+      'key': key,
+      'keywords': query,
+      'offset': '10',
+      'page': '1',
+      'extensions': 'base',
+      'output': 'JSON',
+    };
+
+    final uri = Uri.https('restapi.amap.com', '/v3/place/text', params);
+    final response = await http.get(uri).timeout(const Duration(seconds: 8));
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if ('${data['status']}' != '1') {
+      throw StateError('${data['info'] ?? 'AMap request failed'}');
+    }
+
+    final pois = (data['pois'] as List<dynamic>? ?? const <dynamic>[])
+        .cast<Map<String, dynamic>>();
+
+    final results = <_PoiSuggestion>[];
+    for (final item in pois) {
+      final parsed = _parseSuggestionFromPoi(item);
+      if (parsed != null) {
+        results.add(parsed);
+      }
+    }
+
+    return results;
+  }
+
+  _PoiSuggestion? _parseSuggestionFromTip(Map<String, dynamic> item) {
+    final location = (item['location'] ?? '').toString();
+    final latLng = _parseLatLng(location);
+    if (latLng == null) {
+      return null;
+    }
+
+    final name = (item['name'] ?? '').toString().trim();
+    if (name.isEmpty) {
+      return null;
+    }
+
+    final district = (item['district'] ?? '').toString().trim();
+    final address = (item['address'] ?? '').toString().trim();
+    final id = (item['id'] ?? '').toString().trim();
+
+    return _PoiSuggestion(
+      id: id.isNotEmpty ? id : '${name}_${latLng.latitude}_${latLng.longitude}',
+      name: name,
+      address: address,
+      latLng: latLng,
+      district: district,
+    );
+  }
+
+  _PoiSuggestion? _parseSuggestionFromPoi(Map<String, dynamic> item) {
+    final location = (item['location'] ?? '').toString();
+    final latLng = _parseLatLng(location);
+    if (latLng == null) {
+      return null;
+    }
+
+    final name = (item['name'] ?? '').toString().trim();
+    if (name.isEmpty) {
+      return null;
+    }
+
+    final adname = (item['adname'] ?? '').toString().trim();
+    final cityname = (item['cityname'] ?? '').toString().trim();
+    final district = [cityname, adname].where((e) => e.isNotEmpty).join(' ');
+
+    final address = (item['address'] ?? '').toString().trim();
+    final id = (item['id'] ?? '').toString().trim();
+
+    return _PoiSuggestion(
+      id: id.isNotEmpty ? id : '${name}_${latLng.latitude}_${latLng.longitude}',
+      name: name,
+      address: address,
+      latLng: latLng,
+      district: district,
+    );
+  }
+
+  LatLng? _parseLatLng(String value) {
+    final parts = value.split(',');
+    if (parts.length != 2) return null;
+
+    final lng = double.tryParse(parts[0]);
+    final lat = double.tryParse(parts[1]);
+    if (lng == null || lat == null) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+
+    return LatLng(lat, lng);
+  }
+
+  Future<void> _onSuggestionSelected(
+    _SearchField field,
+    _PoiSuggestion suggestion,
+  ) async {
+    if (field == _SearchField.pickup) {
+      _pickupSelection = suggestion;
+      _pickupController.text = suggestion.name;
+      _pickupController.selection = TextSelection.collapsed(
+        offset: _pickupController.text.length,
+      );
+      _pickupFocusNode.unfocus();
+    } else {
+      _startSelection = suggestion;
+      _startController.text = suggestion.name;
+      _startController.selection = TextSelection.collapsed(
+        offset: _startController.text.length,
+      );
+      _startFocusNode.unfocus();
+    }
+
+    setState(() {
+      _activeSearchField = null;
+      _isSearching = false;
+      _searchError = null;
+      _suggestions = const <_PoiSuggestion>[];
+    });
+
+    _refreshMarkers();
+
+    if (_mapController != null) {
+      await _mapController!.moveCamera(
+        CameraUpdate.newLatLngZoom(suggestion.latLng, 16.0),
+        duration: 350,
+      );
+    }
+  }
+
+  void _refreshMarkers() {
+    final markers = <Marker>{};
+
+    if (_pickupSelection != null) {
+      markers.add(
+        Marker(
+          position: _pickupSelection!.latLng,
+          infoWindow: InfoWindow(
+            title: _pickupSelection!.name,
+            snippet: _pickupSelection!.subtitle,
+          ),
+        ),
+      );
+    }
+
+    if (_startSelection != null) {
+      markers.add(
+        Marker(
+          position: _startSelection!.latLng,
+          infoWindow: InfoWindow(
+            title: _startSelection!.name,
+            snippet: _startSelection!.subtitle,
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _selectedMarkers = markers;
+    });
+  }
+
+  void _onMapPoiTapped(AMapPoi poi) {
+    final location = poi.latLng;
+    if (location == null) return;
+
+    _showPoiSelectionBottomSheet(poi, location);
+  }
+
+  void _showPoiSelectionBottomSheet(AMapPoi poi, LatLng latLng) {
+    FocusScope.of(context).unfocus();
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xC72B5A5B),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border(
+              top: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with POI name
+                Row(
+                  children: [
+                    const Icon(Icons.place, color: Color(0xFFCBF6EE), size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            poi.name ?? 'Unknown Location',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFEFFFF8),
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Action buttons
+                if (_mode == UserMode.driver) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        _setPickupFromPoi(poi, latLng);
+                        Navigator.pop(context);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(
+                          0xFF5FC99E,
+                        ).withValues(alpha: 0.88),
+                        foregroundColor: const Color(0xFFEFFFF8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      child: const Text(
+                        'My passenger is here',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        _setStartFromPoi(poi, latLng);
+                        Navigator.pop(context);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFEFFFF8),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.24),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      child: const Text(
+                        "I'll go from here",
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        _setPickupFromPoi(poi, latLng);
+                        Navigator.pop(context);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(
+                          0xFF5FC99E,
+                        ).withValues(alpha: 0.88),
+                        foregroundColor: const Color(0xFFEFFFF8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      child: const Text(
+                        'My driver is here',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        _setStartFromPoi(poi, latLng);
+                        Navigator.pop(context);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFEFFFF8),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.24),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      child: const Text(
+                        "I'm here",
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _setPickupFromPoi(AMapPoi poi, LatLng latLng) {
+    final suggestion = _PoiSuggestion(
+      id: poi.id ?? '${poi.name}_${latLng.latitude}_${latLng.longitude}',
+      name: poi.name ?? 'Unknown',
+      address: '',
+      latLng: latLng,
+      district: '',
+    );
+
+    _pickupSelection = suggestion;
+    _pickupController.text = suggestion.name;
+    _pickupController.selection = TextSelection.collapsed(
+      offset: _pickupController.text.length,
+    );
+
+    setState(() {
+      _activeSearchField = null;
+    });
+
+    _refreshMarkers();
+  }
+
+  void _setStartFromPoi(AMapPoi poi, LatLng latLng) {
+    final suggestion = _PoiSuggestion(
+      id: poi.id ?? '${poi.name}_${latLng.latitude}_${latLng.longitude}',
+      name: poi.name ?? 'Unknown',
+      address: '',
+      latLng: latLng,
+      district: '',
+    );
+
+    _startSelection = suggestion;
+    _startController.text = suggestion.name;
+    _startController.selection = TextSelection.collapsed(
+      offset: _startController.text.length,
+    );
+
+    setState(() {
+      _activeSearchField = null;
+    });
+
+    _refreshMarkers();
   }
 
   Widget _glassCard({
