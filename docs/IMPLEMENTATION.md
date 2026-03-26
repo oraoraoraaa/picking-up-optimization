@@ -8,7 +8,7 @@ Whenever you add a new feature or make whatever modification, describe them in d
 
 To display the dashboard:
 
-![dashboard](../resource/images/design/pickup_op_dashboard_v1.png)
+![dashboard](../resource/images/design/dashboard_v1.png)
 
 We need:
 
@@ -184,7 +184,7 @@ Notes:
 - `amap_map` itself does not provide built-in POI autocomplete/search methods in `AMapController`, so search suggestions are implemented through AMap Web Service APIs.
 - If no valid search key is configured, the suggestion panel displays a setup hint.
 
-### Implementation Update (2026-03-27, Keyboard Dismissal & Interactive Map POI Selection)
+### Implementation Update (2026-03-26, Keyboard Dismissal & Interactive Map POI Selection)
 
 Enhanced UX with keyboard dismissal and interactive map-based location selection.
 
@@ -224,4 +224,7 @@ Technical Notes:
 - No address/district information is available from map POI taps, so these fields are set to empty strings in the selection model.
 - If address information is needed from map taps, a reverse geocoding API call would be required (separate implementation).
 - Bottom sheet only displays POI name without subtitle (address unavailable).
-  
+
+### Implementation Results (2026-03-26)
+
+![screenshot_dashboard_v1](../resource/images/screenshot/dashboard_v1.png)
