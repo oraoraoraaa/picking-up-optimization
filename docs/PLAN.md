@@ -21,7 +21,7 @@
 
 ## 1. Product Scope and Success Criteria (DONE)
 
-See [`docs/v1-requirements.md`](https://github.com/oraoraoraaa/picking-up-optimization/blob/main/docs/v1-requirements.md) for this step.
+See [`docs/v1-requirements.md`](v1-requirements.md) for this step.
 
 ---
 
@@ -55,7 +55,7 @@ See [`docs/v1-requirements.md`](https://github.com/oraoraoraaa/picking-up-optimi
 
 ## 3. Repository and Module Layout
 
-- See [`docs/adr/`](https://github.com/oraoraoraaa/picking-up-optimization/blob/main/docs/adr).
+- See [`docs/adr/`](adr).
 
 ---
 

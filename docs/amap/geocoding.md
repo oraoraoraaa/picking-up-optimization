@@ -22,7 +22,7 @@
 | output   | 返回数据格式类型   | 可选输入内容包括：JSON，XML。设置 JSON 返回结果数据将会以 JSON 结构构成；如果设置 XML 返回结果数据将以 XML 结构构成。 | 可选     | JSON                   |
 | callback | 回调函数           | callback 值是用户定义的函数名称，此参数只在 output 参数设置为 JSON 时有效。                                       | 可选     | 无                     |
 
-For querying city code, see [`docs/amap/adcode_citycode.csv`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/adcode_citycode.csv).
+For querying city code, see [`docs/amap/adcode_citycode.csv`](adcode_citycode.csv).
 
 ### Example
 
@@ -30,7 +30,7 @@ For querying city code, see [`docs/amap/adcode_citycode.csv`](https://github.com
 https://restapi.amap.com/v3/geocode/geo?output=json&address=陕西省西安市新城区西安钟楼&key=<YOUR_KEY>
 ```
 
-Return value: See [`docs/amap/geocoding.json`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/geocoding.json).
+Return value: See [`docs/amap/geocoding.json`](geocoding.json).
 
 ### Return Explanation
 
@@ -81,7 +81,7 @@ Return value: See [`docs/amap/geocoding.json`](https://github.com/oraoraoraaa/pi
 https://restapi.amap.com/v3/geocode/regeo?output=json&location=108.94703,34.25943&radius=1000&extensions=all&key=<YOUR_KEY>
 ```
 
-Return value: See [`docs/amap/geocoding_reverse.json`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/geocoding_reverse.json).
+Return value: See [`docs/amap/geocoding_reverse.json`](geocoding_reverse.json).
 
 ### Return Explanation
 

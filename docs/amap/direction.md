@@ -32,7 +32,7 @@
 https://restapi.amap.com/v3/geocode/geo?address=陕西省西安市新城区西安钟楼&output=JSON&key=<YOUR_KEY>
 ```
 
-Return value: See [`docs/amap/geocoding.json`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/geocoding.json).
+Return value: See [`docs/amap/geocoding.json`](geocoding.json).
 
 ### Return Explanation
 
@@ -109,7 +109,7 @@ Return value: See [`docs/amap/geocoding.json`](https://github.com/oraoraoraaa/pi
 | output      | 返回数据格式类型                   | 可选值：JSON，XML                                                                                          | 可选           | JSON   |
 | callback    | 回调函数                           | callback值是用户定义的函数名称，此参数只在output=JSON时有效                                                 | 可选           | 无     |
 
-For querying city code, see [`docs/amap/adcode_citycode.csv`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/adcode_citycode.csv).
+For querying city code, see [`docs/amap/adcode_citycode.csv`](adcode_citycode.csv).
 
 ### Example
 
@@ -117,7 +117,7 @@ For querying city code, see [`docs/amap/adcode_citycode.csv`](https://github.com
 https://restapi.amap.com/v3/direction/transit/integrated?output=json&origin=108.983741,34.246233&destination=108.94703,34.25943&city=029&key=<YOUR_KEY>
 ```
 
-Return value: See [`docs/amap/direction_transit.json`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/direction_transit.json).
+Return value: See [`docs/amap/direction_transit.json`](direction_transit.json).
 
 ### Return Explanation
 
@@ -306,7 +306,7 @@ Return value: See [`docs/amap/direction_transit.json`](https://github.com/oraora
 https://restapi.amap.com/v3/direction/driving?output=json&extensions=all&origin=108.983741,34.246233&destination=108.94703,34.25943&key=<YOUR_KEY>
 ```
 
-Return value: See [`docs/amap/direction_driving.json`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/direction_driving.json).
+Return value: See [`docs/amap/direction_driving.json`](direction_driving.json).
 
 ### Return Explanation
 
@@ -453,7 +453,7 @@ Return value: See [`docs/amap/direction_driving.json`](https://github.com/oraora
 https://restapi.amap.com/v4/direction/bicycling?output=json&origin=108.983741,34.246233&destination=108.94703,34.25943&key=<YOUR_KEY>
 ```
 
-Return value: See [`docs/amap/direction_cycling.json`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/direction_cycling.json).
+Return value: See [`docs/amap/direction_cycling.json`](direction_cycling.json).
 
 ### Return Explanation
 
@@ -503,7 +503,7 @@ Return value: See [`docs/amap/direction_cycling.json`](https://github.com/oraora
 https://restapi.amap.com/v3/distance?type=1&origins=108.983741,34.246233&destination`=108.94703,34.25943&key=<YOUR_KEY>
 ```
 
-Return value: See [`docs/amap/direction_measurement.json`](https://github.com/oraoraoraaa/picking-up-optimization/tree/main/docs/amap/direction_measurement.json).
+Return value: See [`docs/amap/direction_measurement.json`](direction_measurement.json).
 
 ### Return Explanation
 

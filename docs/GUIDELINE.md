@@ -62,7 +62,7 @@ Minimum knowledge expected:
 ## 1. Commit Message Convention
 
 All commits must follow the Conventional Commits specification:
-https://www.conventionalcommits.org/en/v1.0.0/
+`https://www.conventionalcommits.org/en/v1.0.0/`
 
 Pull requests that do not follow this convention are likely to be desk-rejected during review.
 
@@ -104,4 +104,4 @@ Again, if any of the changes does not fit in the guideline addressed in the docu
 
 ## That's All, Happy Coding
 
-(p.s. Your next step could probably in [`docs/PLAN.md`](https://github.com/oraoraoraaa/picking-up-optimization/blob/main/docs/PLAN.md))
+(p.s. Your next step could probably in [`docs/PLAN.md`](PLAN.md))
