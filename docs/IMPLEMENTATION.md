@@ -228,3 +228,35 @@ Technical Notes:
 ### Implementation Results (2026-03-26)
 
 ![screenshot_dashboard_v1](../resource/images/screenshot/dashboard_v1.png)
+
+### Implementation Update (2026-03-27, Smooth Interaction Animations)
+
+Added smooth transitions across dashboard interactive widgets so state changes feel continuous instead of abrupt.
+
+Files modified:
+
+- `app/flutter/lib/main.dart`
+
+Completed items:
+
+- Added shared animation timing constants for consistent motion across widgets.
+- Enhanced top-right mode selector animation:
+  - Wrapped selector with `AnimatedSize` for smooth size interpolation.
+  - Added `AnimatedSwitcher` + fade/scale transition between collapsed and expanded states.
+  - Preserved selection behavior while making expansion/collapse feel fluid.
+- Enhanced mode option selection animation:
+  - Replaced static option container with `AnimatedContainer` so selected/unselected background and border transition smoothly.
+  - Added `AnimatedSwitcher` for check icon appearance/disappearance.
+- Enhanced bottom prompt transition:
+  - Wrapped mode-dependent prompt text with `AnimatedSwitcher` using fade + slide transition when switching Driver/Passenger mode.
+- Enhanced search bar interaction animation:
+  - Replaced static search field shell with `AnimatedContainer`.
+  - Added active-state transitions (subtle glow, stronger border, slightly stronger fill) when field is focused/active.
+  - Added `AnimatedSwitcher` for trailing search action (loading spinner / clear button / empty placeholder).
+- Enhanced map loading overlay transition:
+  - Replaced hard show/hide with `AnimatedSwitcher` so the initial location-loading overlay fades out smoothly after first location lock.
+
+Notes:
+
+- Existing interaction logic (mode changes, search behavior, marker updates, POI bottom sheet actions) remains unchanged.
+- This update is purely UX motion polish, designed to improve perceived responsiveness without changing business behavior.

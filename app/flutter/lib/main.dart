@@ -62,6 +62,9 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  static const Duration _uiAnimDuration = Duration(milliseconds: 260);
+  static const Duration _uiAnimFastDuration = Duration(milliseconds: 180);
+
   static const CameraPosition _defaultCamera = CameraPosition(
     target: LatLng(39.909187, 116.397451),
     zoom: 11.5,
@@ -247,28 +250,43 @@ class _DashboardPageState extends State<DashboardPage> {
               }
             },
           ),
-          if (!_locationReady)
-            Positioned.fill(
-              child: Container(
-                color: const Color(0xFF0A1A2B),
-                alignment: Alignment.center,
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 26,
-                      height: 26,
-                      child: CircularProgressIndicator(strokeWidth: 2.8),
-                    ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Fetching current location...',
-                      style: TextStyle(color: Color(0xFFE7F8FF), fontSize: 14),
-                    ),
-                  ],
-                ),
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: _locationReady,
+              child: AnimatedSwitcher(
+                duration: _uiAnimDuration,
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: _locationReady
+                    ? const SizedBox.shrink()
+                    : Container(
+                        key: const ValueKey<String>('location_loading_overlay'),
+                        color: const Color(0xFF0A1A2B),
+                        alignment: Alignment.center,
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.8,
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                            Text(
+                              'Fetching current location...',
+                              style: TextStyle(
+                                color: Color(0xFFE7F8FF),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
             ),
+          ),
         ],
       );
     }
@@ -316,8 +334,33 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildModeSelector() {
-    if (_modeMenuExpanded) {
-      return _glassCard(
+    return AnimatedSize(
+      duration: _uiAnimDuration,
+      curve: Curves.easeOutCubic,
+      child: AnimatedSwitcher(
+        duration: _uiAnimDuration,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          final scale = Tween<double>(begin: 0.94, end: 1.0).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+          );
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(scale: scale, child: child),
+          );
+        },
+        child: _modeMenuExpanded
+            ? _buildExpandedModeSelector()
+            : _buildCollapsedModeSelector(),
+      ),
+    );
+  }
+
+  Widget _buildExpandedModeSelector() {
+    return KeyedSubtree(
+      key: const ValueKey<String>('mode_expanded'),
+      child: _glassCard(
         width: 228,
         borderRadius: 22,
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
@@ -338,20 +381,25 @@ class _DashboardPageState extends State<DashboardPage> {
             _modeOption(UserMode.passenger, "I'm the passenger"),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    return GestureDetector(
-      onTap: () => setState(() => _modeMenuExpanded = true),
-      child: _glassCard(
-        borderRadius: 20,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: Text(
-          _mode == UserMode.driver ? 'Driver Mode' : 'Passenger Mode',
-          style: const TextStyle(
-            color: Color(0xFFF4FAFF),
-            fontSize: 17,
-            fontWeight: FontWeight.w500,
+  Widget _buildCollapsedModeSelector() {
+    return KeyedSubtree(
+      key: const ValueKey<String>('mode_collapsed'),
+      child: GestureDetector(
+        onTap: () => setState(() => _modeMenuExpanded = true),
+        child: _glassCard(
+          borderRadius: 20,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Text(
+            _mode == UserMode.driver ? 'Driver Mode' : 'Passenger Mode',
+            style: const TextStyle(
+              color: Color(0xFFF4FAFF),
+              fontSize: 17,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ),
@@ -369,7 +417,9 @@ class _DashboardPageState extends State<DashboardPage> {
         _clearAllLocations();
       },
       borderRadius: BorderRadius.circular(14),
-      child: Container(
+      child: AnimatedContainer(
+        duration: _uiAnimDuration,
+        curve: Curves.easeOutCubic,
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
@@ -389,10 +439,20 @@ class _DashboardPageState extends State<DashboardPage> {
                 style: const TextStyle(color: Color(0xFFF4FAFF), fontSize: 16),
               ),
             ),
-            if (selected)
-              const Icon(Icons.check, color: Colors.white, size: 20)
-            else
-              const SizedBox(width: 20),
+            AnimatedSwitcher(
+              duration: _uiAnimFastDuration,
+              child: selected
+                  ? const Icon(
+                      Icons.check,
+                      key: ValueKey<String>('selected_mode_icon'),
+                      color: Colors.white,
+                      size: 20,
+                    )
+                  : const SizedBox(
+                      key: ValueKey<String>('unselected_mode_icon_placeholder'),
+                      width: 20,
+                    ),
+            ),
           ],
         ),
       ),
@@ -416,9 +476,29 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            prompt,
-            style: const TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
+          AnimatedSwitcher(
+            duration: _uiAnimDuration,
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              final slide =
+                  Tween<Offset>(
+                    begin: const Offset(0, 0.22),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  );
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(position: slide, child: child),
+              );
+            },
+            child: Text(
+              prompt,
+              key: ValueKey<String>(prompt),
+              style: const TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
+            ),
           ),
           const SizedBox(height: 8),
           _searchBar(
@@ -474,15 +554,31 @@ class _DashboardPageState extends State<DashboardPage> {
     required _SearchField field,
   }) {
     final showSuggestions = _activeSearchField == field;
+    final isActive = showSuggestions || focusNode.hasFocus;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
+        AnimatedContainer(
+          duration: _uiAnimDuration,
+          curve: Curves.easeOutCubic,
           height: 46,
           decoration: BoxDecoration(
-            color: const Color(0xFF58BFB7).withValues(alpha: 0.93),
+            color: const Color(
+              0xFF58BFB7,
+            ).withValues(alpha: isActive ? 0.97 : 0.93),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: isActive ? 0.30 : 0.18),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(
+                  0xFF40D4C8,
+                ).withValues(alpha: isActive ? 0.24 : 0.0),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
@@ -509,30 +605,41 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
               ),
-              if (_isSearching && showSuggestions)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Color(0xFFE9FFF8),
-                  ),
-                )
-              else if (controller.text.trim().isNotEmpty)
-                IconButton(
-                  onPressed: () => _clearSearch(field),
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: Color(0xFFE9FFF8),
-                    size: 21,
-                  ),
-                  splashRadius: 18,
-                ),
+              AnimatedSwitcher(
+                duration: _uiAnimFastDuration,
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                child: _isSearching && showSuggestions
+                    ? const SizedBox(
+                        key: ValueKey<String>('search_loading'),
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFE9FFF8),
+                        ),
+                      )
+                    : controller.text.trim().isNotEmpty
+                    ? IconButton(
+                        key: const ValueKey<String>('search_clear_button'),
+                        onPressed: () => _clearSearch(field),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Color(0xFFE9FFF8),
+                          size: 21,
+                        ),
+                        splashRadius: 18,
+                      )
+                    : const SizedBox(
+                        key: ValueKey<String>('search_action_empty'),
+                        width: 18,
+                      ),
+              ),
             ],
           ),
         ),
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
+          duration: _uiAnimFastDuration,
           switchInCurve: Curves.easeOut,
           switchOutCurve: Curves.easeIn,
           child: showSuggestions
