@@ -164,6 +164,37 @@ pub fn fetch_walking_path(
     Some((secs, polyline))
 }
 
+/// Fetch the passenger's bicycling path: (duration secs, polyline).
+pub fn fetch_bicycling_path(
+    client: &Client,
+    key: &str,
+    from: GeoPoint,
+    to: GeoPoint,
+) -> Option<(f64, Vec<GeoPoint>)> {
+    let params = [
+        ("origin", to_lonlat(from)),
+        ("destination", to_lonlat(to)),
+        ("key", key.to_string()),
+    ];
+    let body = get_json(client, BICYCLING_URL, &params)?;
+    let path = body.pointer("/data/paths/0")?;
+    let secs = path.get("duration").and_then(value_to_f64)?;
+
+    let mut polyline: Vec<GeoPoint> = Vec::new();
+    if let Some(steps) = path.get("steps").and_then(Value::as_array) {
+        for step in steps {
+            if let Some(raw) = step.get("polyline").and_then(Value::as_str) {
+                for vertex in parse_polyline(raw) {
+                    if polyline.last() != Some(&vertex) {
+                        polyline.push(vertex);
+                    }
+                }
+            }
+        }
+    }
+    Some((secs, polyline))
+}
+
 /// Fetch the passenger's travel time in seconds for a given mode.
 pub fn fetch_passenger_secs(
     client: &Client,
@@ -176,13 +207,7 @@ pub fn fetch_passenger_secs(
     match mode {
         MobilityMode::Walking => fetch_walking_path(client, key, from, to).map(|(secs, _)| secs),
         MobilityMode::Bicycle => {
-            let params = [
-                ("origin", to_lonlat(from)),
-                ("destination", to_lonlat(to)),
-                ("key", key.to_string()),
-            ];
-            let body = get_json(client, BICYCLING_URL, &params)?;
-            body.pointer("/data/paths/0/duration").and_then(value_to_f64)
+            fetch_bicycling_path(client, key, from, to).map(|(secs, _)| secs)
         }
         MobilityMode::Transit => {
             let city = city?;

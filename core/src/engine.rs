@@ -171,6 +171,25 @@ pub fn rank_options(mut options: Vec<EvaluatedOption>) -> Vec<EvaluatedOption> {
     options
 }
 
+/// Reduce a ranked list to the best option per passenger mode, preserving
+/// rank order. Because the input is sorted ascending by score, the first
+/// occurrence of each mode is that mode's winner.
+pub fn best_per_mode(ranked: &[EvaluatedOption]) -> Vec<EvaluatedOption> {
+    let mut seen: Vec<MobilityMode> = Vec::new();
+    ranked
+        .iter()
+        .filter(|option| {
+            if seen.contains(&option.mode) {
+                false
+            } else {
+                seen.push(option.mode);
+                true
+            }
+        })
+        .cloned()
+        .collect()
+}
+
 /// Pick the winner among ranked options, or `None` when staying put wins.
 ///
 /// The stay-put baseline has zero passenger effort, so its score is simply
@@ -338,5 +357,41 @@ mod tests {
     fn decide_handles_empty_options() {
         let cfg = EngineConfig::default();
         assert!(decide(12.0, &[], &cfg).is_none());
+    }
+
+    fn mode_option(mode: MobilityMode, score: f64) -> EvaluatedOption {
+        EvaluatedOption {
+            meeting_point: PEOPLES_SQUARE,
+            route_index: 0,
+            mode,
+            driver_eta_min: score,
+            passenger_eta_min: 1.0,
+            completion_min: score,
+            score,
+        }
+    }
+
+    #[test]
+    fn best_per_mode_keeps_first_occurrence_in_rank_order() {
+        let ranked = vec![
+            mode_option(MobilityMode::Bicycle, 8.0),
+            mode_option(MobilityMode::Walking, 9.0),
+            mode_option(MobilityMode::Bicycle, 10.0),
+            mode_option(MobilityMode::Transit, 11.0),
+            mode_option(MobilityMode::Walking, 12.0),
+        ];
+        let winners = best_per_mode(&ranked);
+
+        assert_eq!(winners.len(), 3);
+        assert_eq!(winners[0].mode, MobilityMode::Bicycle);
+        assert_eq!(winners[0].score, 8.0);
+        assert_eq!(winners[1].mode, MobilityMode::Walking);
+        assert_eq!(winners[1].score, 9.0);
+        assert_eq!(winners[2].mode, MobilityMode::Transit);
+    }
+
+    #[test]
+    fn best_per_mode_handles_empty_input() {
+        assert!(best_per_mode(&[]).is_empty());
     }
 }

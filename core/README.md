@@ -22,6 +22,8 @@ score = max(driver_eta, passenger_eta) + 0.15 * passenger_eta + mode_penalty
 
 The best option must beat the stay-put baseline by at least 1.5 minutes, otherwise the engine recommends keeping the original pickup point. See `docs/IMPLEMENTATION.md` for the full description.
 
+Since v2, the output contains one suggestion per passenger mode (walking / bicycle / transit, reduced via `engine::best_per_mode`) plus the stay-put plan, each with its own ETAs, driver saving, and route polylines; exactly one entry is flagged `recommended`.
+
 > The Flutter app currently runs a documented Dart mirror of this engine on-device (`app/flutter/lib/src/pickup_optimizer.dart`) until the FFI bridge lands. Keep weights and rules in sync when tuning.
 
 ## Run It

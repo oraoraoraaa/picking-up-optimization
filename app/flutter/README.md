@@ -8,7 +8,7 @@ Whenever you modify the files in this folder, please update the description belo
 
 - Dashboard (`lib/main.dart`): full-screen AMap with live location, driver/passenger mode selector, POI search (input tips + keyword fallback), map POI tap selection.
 - Optimization service (`lib/src/pickup_optimizer.dart`): on-device port of the Rust core engine (`core/src/engine.rs`) — fetches the driver route and candidate ETAs from AMap Web Services, scores and ranks meeting points, and decides versus staying put. Keep its constants in sync with the Rust `EngineConfig`.
-- Result page (`lib/src/result_page.dart`): implements `resource/images/design/result_v1.png` — route preview map (driver route + passenger path), `FASTEST` summary card, `MEETING UP LOCATION` card, Share (clipboard) and Open in Maps (AMap URI) actions.
+- Result page (`lib/src/result_page.dart`): the `resource/images/design/result_v1.png` layout extended with a tappable `SUGGESTIONS` list (v2) — one plan per passenger mode (walk / bicycle / transit) plus stay put, with a `FASTEST` badge on the recommended plan. Selecting a plan redraws the route preview map (driver route + passenger path), refits the camera, and updates the detail card, `MEETING UP LOCATION` card, and the Share / Open in Maps actions.
 - Shared key config lives in `lib/src/amap_config.dart`.
 
 ## Run

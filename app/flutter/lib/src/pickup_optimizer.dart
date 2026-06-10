@@ -39,6 +39,17 @@ extension MobilityModeLabel on MobilityMode {
         return 'Take transit';
     }
   }
+
+  String get displayName {
+    switch (this) {
+      case MobilityMode.walking:
+        return 'Walk';
+      case MobilityMode.bicycle:
+        return 'Bicycle';
+      case MobilityMode.transit:
+        return 'Transit';
+    }
+  }
 }
 
 class OptimizationRequest {
@@ -57,49 +68,66 @@ class OptimizationRequest {
   final String apiKey;
 }
 
-class PickupRecommendation {
-  const PickupRecommendation({
+/// One displayable meeting plan, carrying everything the result page needs
+/// to render it standalone (mirrors `Suggestion` in the Rust core; the
+/// stay-put plan is folded in as a suggestion with `mode == null`).
+class PickupSuggestion {
+  const PickupSuggestion({
     required this.stayPut,
+    required this.mode,
+    required this.recommended,
     required this.meetingPoint,
     required this.meetingPointName,
     required this.meetingPointAddress,
-    required this.mode,
     required this.driverEtaMin,
     required this.passengerEtaMin,
     required this.completionMin,
     required this.driverSavedMin,
+    required this.score,
+    required this.driverRoutePolyline,
+    required this.passengerPathPolyline,
   });
 
   final bool stayPut;
+
+  /// Null for the stay-put plan.
+  final MobilityMode? mode;
+
+  /// True on exactly one suggestion per result set.
+  final bool recommended;
   final LatLng meetingPoint;
   final String meetingPointName;
   final String meetingPointAddress;
-  final MobilityMode? mode;
   final double driverEtaMin;
   final double passengerEtaMin;
   final double completionMin;
   final double driverSavedMin;
+  final double score;
+
+  /// Driver start -> this suggestion's meeting point.
+  final List<LatLng> driverRoutePolyline;
+
+  /// Passenger start -> meeting point (empty for stay-put).
+  final List<LatLng> passengerPathPolyline;
 }
 
 class OptimizationResult {
   const OptimizationResult({
     required this.dataSource,
     required this.baselineDriverEtaMin,
-    required this.best,
-    required this.driverRoutePolyline,
-    required this.passengerPathPolyline,
+    required this.suggestions,
   });
 
   /// "amap", "amap_with_fallback", or "fallback".
   final String dataSource;
   final double baselineDriverEtaMin;
-  final PickupRecommendation best;
 
-  /// Driver start -> meeting point.
-  final List<LatLng> driverRoutePolyline;
+  /// Per-mode winners plus the stay-put plan, recommended entry first and
+  /// the rest ascending by score. Never empty (stay-put is always present).
+  final List<PickupSuggestion> suggestions;
 
-  /// Passenger start -> meeting point (empty when staying put).
-  final List<LatLng> passengerPathPolyline;
+  PickupSuggestion get recommended =>
+      suggestions.firstWhere((s) => s.recommended, orElse: () => suggestions.first);
 }
 
 class RoutePoint {
@@ -244,6 +272,13 @@ double scoreOption(
       modePenaltyMin(mode);
 }
 
+/// Mirrors `engine::best_per_mode` in the Rust core: reduce a ranked list to
+/// the best option per mode, preserving rank order.
+List<EvaluatedOption> bestPerMode(List<EvaluatedOption> ranked) {
+  final seen = <MobilityMode>{};
+  return ranked.where((option) => seen.add(option.mode)).toList(growable: false);
+}
+
 class PickupOptimizer {
   PickupOptimizer({http.Client? httpClient})
       : _http = httpClient ?? http.Client();
@@ -310,67 +345,79 @@ class PickupOptimizer {
       return a.driverEtaMin.compareTo(b.driverEtaMin);
     });
 
-    // Mirrors `engine::decide`: the winner must clearly beat stay-put.
-    EvaluatedOption? winner;
-    if (evaluated.isNotEmpty &&
+    // Mirrors `engine::decide`: a switch must clearly beat stay-put.
+    final switchWins = evaluated.isNotEmpty &&
         evaluated.first.score <=
-            baselineDriverEtaMin - EngineTuning.minImprovementMin) {
-      winner = evaluated.first;
-    }
+            baselineDriverEtaMin - EngineTuning.minImprovementMin;
 
-    if (winner == null) {
-      final place = await _reverseGeocode(key, request.passenger);
-      return OptimizationResult(
-        dataSource: _dataSource,
-        baselineDriverEtaMin: baselineDriverEtaMin,
-        best: PickupRecommendation(
-          stayPut: true,
-          meetingPoint: request.passenger,
-          meetingPointName: request.passengerName,
-          meetingPointAddress: place ?? _coordsLabel(request.passenger),
-          mode: null,
-          driverEtaMin: baselineDriverEtaMin,
-          passengerEtaMin: 0,
-          completionMin: baselineDriverEtaMin,
-          driverSavedMin: 0,
+    // Per-mode winners preserve rank order, so when a switch wins the
+    // recommended option is exactly the first winner.
+    final perMode = bestPerMode(evaluated);
+
+    final suggestions = <PickupSuggestion>[];
+    for (var i = 0; i < perMode.length; i++) {
+      final option = perMode[i];
+      final place = await _reverseGeocode(key, option.meetingPoint);
+      suggestions.add(
+        PickupSuggestion(
+          stayPut: false,
+          mode: option.mode,
+          recommended: switchWins && i == 0,
+          meetingPoint: option.meetingPoint,
+          meetingPointName: place.name ?? "a point on the driver's route",
+          meetingPointAddress:
+              place.address ?? _coordsLabel(option.meetingPoint),
+          driverEtaMin: option.driverEtaMin,
+          passengerEtaMin: option.passengerEtaMin,
+          completionMin: option.completionMin,
+          driverSavedMin:
+              math.max(baselineDriverEtaMin - option.driverEtaMin, 0),
+          score: option.score,
+          driverRoutePolyline: route.points
+              .sublist(0, option.routeIndex + 1)
+              .map((p) => p.point)
+              .toList(growable: false),
+          passengerPathPolyline: await _passengerPolyline(
+            key,
+            option.mode,
+            request.passenger,
+            option.meetingPoint,
+          ),
         ),
-        driverRoutePolyline:
-            route.points.map((p) => p.point).toList(growable: false),
-        passengerPathPolyline: const <LatLng>[],
       );
     }
 
-    final driverPolyline = route.points
-        .sublist(0, winner.routeIndex + 1)
-        .map((p) => p.point)
-        .toList(growable: false);
+    final stayPutPlace = await _reverseGeocode(key, request.passenger);
+    suggestions.add(
+      PickupSuggestion(
+        stayPut: true,
+        mode: null,
+        recommended: !switchWins,
+        meetingPoint: request.passenger,
+        meetingPointName: request.passengerName,
+        meetingPointAddress:
+            stayPutPlace.address ?? _coordsLabel(request.passenger),
+        driverEtaMin: baselineDriverEtaMin,
+        passengerEtaMin: 0,
+        completionMin: baselineDriverEtaMin,
+        driverSavedMin: 0,
+        score: baselineDriverEtaMin,
+        driverRoutePolyline:
+            route.points.map((p) => p.point).toList(growable: false),
+        passengerPathPolyline: const <LatLng>[],
+      ),
+    );
 
-    List<LatLng>? passengerPolyline;
-    if (winner.mode == MobilityMode.walking) {
-      passengerPolyline =
-          await _fetchWalkingPolyline(key, request.passenger, winner.meetingPoint);
-    }
-    passengerPolyline ??= <LatLng>[request.passenger, winner.meetingPoint];
-
-    final place = await _reverseGeocode(key, winner.meetingPoint);
+    // Recommended entry first, the rest ascending by score.
+    suggestions.sort((a, b) {
+      if (a.recommended != b.recommended) return a.recommended ? -1 : 1;
+      return a.score.compareTo(b.score);
+    });
 
     return OptimizationResult(
       dataSource: _dataSource,
       baselineDriverEtaMin: baselineDriverEtaMin,
-      best: PickupRecommendation(
-        stayPut: false,
-        meetingPoint: winner.meetingPoint,
-        meetingPointName: place ?? 'a point on the driver\'s route',
-        meetingPointAddress: place ?? _coordsLabel(winner.meetingPoint),
-        mode: winner.mode,
-        driverEtaMin: winner.driverEtaMin,
-        passengerEtaMin: winner.passengerEtaMin,
-        completionMin: winner.completionMin,
-        driverSavedMin:
-            math.max(baselineDriverEtaMin - winner.driverEtaMin, 0),
-      ),
-      driverRoutePolyline: driverPolyline,
-      passengerPathPolyline: passengerPolyline,
+      suggestions: suggestions,
     );
   }
 
@@ -531,13 +578,47 @@ class PickupOptimizer {
     return secs;
   }
 
-  Future<List<LatLng>?> _fetchWalkingPolyline(
+  /// Passenger start -> meeting point path; walking and bicycling have real
+  /// path APIs, transit falls back to a straight line (mirrors the core).
+  Future<List<LatLng>> _passengerPolyline(
     String key,
+    MobilityMode mode,
+    LatLng from,
+    LatLng to,
+  ) async {
+    List<LatLng>? polyline;
+    switch (mode) {
+      case MobilityMode.walking:
+        polyline = await _fetchPathPolyline(
+          key,
+          '/v3/direction/walking',
+          ['route', 'paths', 0, 'steps'],
+          from,
+          to,
+        );
+      case MobilityMode.bicycle:
+        polyline = await _fetchPathPolyline(
+          key,
+          '/v4/direction/bicycling',
+          ['data', 'paths', 0, 'steps'],
+          from,
+          to,
+        );
+      case MobilityMode.transit:
+        polyline = null;
+    }
+    return polyline ?? <LatLng>[from, to];
+  }
+
+  Future<List<LatLng>?> _fetchPathPolyline(
+    String key,
+    String apiPath,
+    List<Object> stepsPath,
     LatLng from,
     LatLng to,
   ) async {
     if (key.isEmpty) return null;
-    final data = await _getJson('/v3/direction/walking', <String, String>{
+    final data = await _getJson(apiPath, <String, String>{
       'key': key,
       'origin': _lonLat(from),
       'destination': _lonLat(to),
@@ -545,7 +626,7 @@ class PickupOptimizer {
     });
     if (data == null) return null;
 
-    final steps = _path(data, ['route', 'paths', 0, 'steps']);
+    final steps = _path(data, stepsPath);
     if (steps is! List) return null;
     final polyline = <LatLng>[];
     for (final step in steps) {
@@ -572,9 +653,13 @@ class PickupOptimizer {
     return citycode is String && citycode.isNotEmpty ? citycode : null;
   }
 
-  /// Returns a human-friendly place description, preferring nearby POI names.
-  Future<String?> _reverseGeocode(String key, LatLng location) async {
-    if (key.isEmpty) return null;
+  /// Resolve a human-friendly place name (nearest POI preferred) and a
+  /// formatted address for a coordinate.
+  Future<({String? name, String? address})> _reverseGeocode(
+    String key,
+    LatLng location,
+  ) async {
+    if (key.isEmpty) return (name: null, address: null);
     final data = await _getJson('/v3/geocode/regeo', <String, String>{
       'key': key,
       'location': _lonLat(location),
@@ -582,21 +667,24 @@ class PickupOptimizer {
       'radius': '300',
       'output': 'JSON',
     });
-    if (data == null) return null;
+    if (data == null) return (name: null, address: null);
 
+    String? name;
     final pois = _path(data, ['regeocode', 'pois']);
     if (pois is List && pois.isNotEmpty) {
       final first = pois.first;
       if (first is Map<String, dynamic>) {
-        final name = '${first['name'] ?? ''}'.trim();
-        if (name.isNotEmpty) return name;
+        final poiName = '${first['name'] ?? ''}'.trim();
+        if (poiName.isNotEmpty) name = poiName;
       }
     }
+
+    String? address;
     final formatted = _path(data, ['regeocode', 'formatted_address']);
     if (formatted is String && formatted.trim().isNotEmpty) {
-      return formatted.trim();
+      address = formatted.trim();
     }
-    return null;
+    return (name: name ?? address, address: address);
   }
 
   DrivingRoute _fallbackDrivingRoute(LatLng from, LatLng to) {

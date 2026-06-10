@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:amap_map/amap_map.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,9 +11,10 @@ import 'package:x_amap_base/x_amap_base.dart';
 import 'amap_config.dart';
 import 'pickup_optimizer.dart';
 
-/// Result screen implementing `resource/images/design/result_v1.png`:
-/// route preview map, FASTEST summary card, meeting-up location card,
-/// and Share / Open in Maps actions.
+/// Result screen (v2): the design of `resource/images/design/result_v1.png`
+/// extended with a tappable suggestion list — one entry per passenger mode
+/// (walk / bicycle / transit) plus the stay-put plan. Selecting a suggestion
+/// drives the route preview map, the summary cards, and the actions.
 class ResultPage extends StatefulWidget {
   const ResultPage({super.key, required this.request, this.runOptimization});
 
@@ -19,7 +22,7 @@ class ResultPage extends StatefulWidget {
 
   /// Test seam; defaults to [PickupOptimizer.optimize].
   final Future<OptimizationResult> Function(OptimizationRequest)?
-      runOptimization;
+  runOptimization;
 
   @override
   State<ResultPage> createState() => _ResultPageState();
@@ -27,15 +30,20 @@ class ResultPage extends StatefulWidget {
 
 class _ResultPageState extends State<ResultPage> {
   late Future<OptimizationResult> _future;
+  int _selectedIndex = 0;
+  AMapController? _mapController;
 
   static const Color _pageBackground = Color(0xFF111827);
   static const Color _cardGreenTop = Color(0xFF6FD2A8);
   static const Color _cardGreenBottom = Color(0xFF43AE85);
+  static const Color _cardSlateTop = Color(0xFF5C7693);
+  static const Color _cardSlateBottom = Color(0xFF435A75);
   static const Color _cardPink = Color(0xFFF0C5CE);
   static const Color _sharePurple = Color(0xFFB89AE8);
   static const Color _openBlue = Color(0xFF7FB3E8);
   static const Color _driverRouteColor = Color(0xFF5FA8FF);
   static const Color _passengerPathColor = Color(0xFF53E0B4);
+  static const Color _selectionTeal = Color(0xFF58BFB7);
 
   @override
   void initState() {
@@ -51,26 +59,57 @@ class _ResultPageState extends State<ResultPage> {
 
   void _retry() {
     setState(() {
+      _selectedIndex = 0;
       _future = _run();
     });
   }
 
+  void _selectSuggestion(OptimizationResult result, int index) {
+    if (index == _selectedIndex) return;
+    setState(() {
+      _selectedIndex = index;
+    });
+    final controller = _mapController;
+    if (controller != null) {
+      controller.moveCamera(
+        CameraUpdate.newLatLngBounds(
+          _boundsFor(_focusPoints(result.suggestions[index])),
+          56,
+        ),
+      );
+    }
+  }
+
+  List<LatLng> _focusPoints(PickupSuggestion suggestion) {
+    return <LatLng>[
+      widget.request.driver,
+      widget.request.passenger,
+      suggestion.meetingPoint,
+      ...suggestion.driverRoutePolyline,
+      ...suggestion.passengerPathPolyline,
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _pageBackground,
-      body: SafeArea(
-        child: FutureBuilder<OptimizationResult>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              return _buildResult(snapshot.data!);
-            }
-            if (snapshot.hasError) {
-              return _buildError('${snapshot.error}');
-            }
-            return _buildLoading();
-          },
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Dark page background -> light status bar icons.
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: _pageBackground,
+        body: SafeArea(
+          child: FutureBuilder<OptimizationResult>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                return _buildResult(snapshot.data!);
+              }
+              if (snapshot.hasError) {
+                return _buildError('${snapshot.error}');
+              }
+              return _buildLoading();
+            },
+          ),
         ),
       ),
     );
@@ -197,10 +236,7 @@ class _ResultPageState extends State<ResultPage> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                FilledButton(
-                  onPressed: _retry,
-                  child: const Text('Try again'),
-                ),
+                FilledButton(onPressed: _retry, child: const Text('Try again')),
               ],
             ),
           ),
@@ -215,6 +251,8 @@ class _ResultPageState extends State<ResultPage> {
       'amap_with_fallback' => 'Live + estimates',
       _ => 'Estimates only',
     };
+    final index = _selectedIndex.clamp(0, result.suggestions.length - 1);
+    final selected = result.suggestions[index];
 
     return Column(
       children: [
@@ -225,13 +263,49 @@ class _ResultPageState extends State<ResultPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildMapCard(result),
+                _buildMapCard(selected),
                 const SizedBox(height: 14),
-                _buildFastestCard(result),
+                _buildSuggestionList(result, index),
                 const SizedBox(height: 14),
-                _buildMeetingLocationCard(result),
+                // Cross-fade the detail cards when the selection changes so
+                // switching suggestions feels continuous.
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder:
+                      (Widget child, Animation<double> animation) {
+                        final slide = Tween<Offset>(
+                          begin: const Offset(0, 0.04),
+                          end: Offset.zero,
+                        ).animate(animation);
+                        return FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(position: slide, child: child),
+                        );
+                      },
+                  layoutBuilder:
+                      (Widget? currentChild, List<Widget> previousChildren) {
+                        return Stack(
+                          alignment: Alignment.topCenter,
+                          children: <Widget>[
+                            ...previousChildren,
+                            ?currentChild,
+                          ],
+                        );
+                      },
+                  child: Column(
+                    key: ValueKey<int>(index),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildDetailCard(selected),
+                      const SizedBox(height: 14),
+                      _buildMeetingLocationCard(selected),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 18),
-                _buildActions(result),
+                _buildActions(selected),
               ],
             ),
           ),
@@ -240,21 +314,21 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
-  // --- Map card ---------------------------------------------------------
+  // --- Map card -------------------------------------------------------------
 
-  Widget _buildMapCard(OptimizationResult result) {
-    final height = math.max(MediaQuery.of(context).size.height * 0.38, 230.0);
-    final best = result.best;
+  Widget _buildMapCard(PickupSuggestion selected) {
+    final height = math.max(MediaQuery.of(context).size.height * 0.32, 210.0);
 
     final driverChip = _mapChip(
-      label: 'Drive ${best.driverEtaMin.ceil()} min',
+      label: 'Drive ${selected.driverEtaMin.ceil()} min',
       background: Colors.white.withValues(alpha: 0.92),
       foreground: const Color(0xFF14324F),
     );
     final passengerChip = _mapChip(
-      label: best.stayPut
+      label: selected.stayPut
           ? 'Passenger stays put'
-          : '${best.mode!.verb} ${best.passengerEtaMin.ceil()} min · Suggested',
+          : '${selected.mode!.verb} ${selected.passengerEtaMin.ceil()} min'
+                '${selected.recommended ? ' · Suggested' : ''}',
       background: const Color(0xE0337FD6),
       foreground: Colors.white,
     );
@@ -265,7 +339,7 @@ class _ResultPageState extends State<ResultPage> {
         height: height,
         child: Stack(
           children: [
-            Positioned.fill(child: _buildMapLayer(result)),
+            Positioned.fill(child: _buildMapLayer(selected)),
             Positioned(
               left: 12,
               top: 12,
@@ -313,36 +387,38 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
-  Widget _buildMapLayer(OptimizationResult result) {
+  Widget _buildMapLayer(PickupSuggestion selected) {
     if (supportsAmapPlatform && hasConfiguredMapKey) {
-      return _buildAmapLayer(result);
+      return _buildAmapLayer(selected);
     }
-    return CustomPaint(
-      painter: _RoutePreviewPainter(
-        driverRoute: result.driverRoutePolyline,
-        passengerPath: result.passengerPathPolyline,
-        driverColor: _driverRouteColor,
-        passengerColor: _passengerPathColor,
+    // RepaintBoundary keeps page scrolling from re-rasterizing the preview.
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _RoutePreviewPainter(
+          driverRoute: selected.driverRoutePolyline,
+          passengerPath: selected.passengerPathPolyline,
+          driverColor: _driverRouteColor,
+          passengerColor: _passengerPathColor,
+        ),
       ),
     );
   }
 
-  Widget _buildAmapLayer(OptimizationResult result) {
+  Widget _buildAmapLayer(PickupSuggestion selected) {
     final request = widget.request;
-    final best = result.best;
 
     final polylines = <Polyline>{
-      if (result.driverRoutePolyline.length >= 2)
+      if (selected.driverRoutePolyline.length >= 2)
         Polyline(
-          points: result.driverRoutePolyline,
+          points: selected.driverRoutePolyline,
           color: _driverRouteColor,
           width: 9,
           joinType: JoinType.round,
           capType: CapType.round,
         ),
-      if (result.passengerPathPolyline.length >= 2)
+      if (selected.passengerPathPolyline.length >= 2)
         Polyline(
-          points: result.passengerPathPolyline,
+          points: selected.passengerPathPolyline,
           color: _passengerPathColor,
           width: 7,
           dashLineType: DashLineType.square,
@@ -362,24 +438,21 @@ class _ResultPageState extends State<ResultPage> {
         infoWindow: InfoWindow(title: 'Passenger: ${request.passengerName}'),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
       ),
-      Marker(
-        position: best.meetingPoint,
-        infoWindow: InfoWindow(title: 'Meet here: ${best.meetingPointName}'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      ),
+      if (!selected.stayPut)
+        Marker(
+          position: selected.meetingPoint,
+          infoWindow: InfoWindow(
+            title: 'Meet here: ${selected.meetingPointName}',
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
+          ),
+        ),
     };
-
-    final allPoints = <LatLng>[
-      request.driver,
-      request.passenger,
-      best.meetingPoint,
-      ...result.driverRoutePolyline,
-      ...result.passengerPathPolyline,
-    ];
 
     return AMapWidget(
       initialCameraPosition: CameraPosition(
-        target: best.meetingPoint,
+        target: selected.meetingPoint,
         zoom: 13,
       ),
       trafficEnabled: true,
@@ -389,9 +462,15 @@ class _ResultPageState extends State<ResultPage> {
       tiltGesturesEnabled: false,
       polylines: polylines,
       markers: markers,
+      // The map sits inside a scroll view; claim drags eagerly so panning
+      // moves the map instead of scrolling the page.
+      gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+        Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
+      },
       onMapCreated: (AMapController controller) {
+        _mapController = controller;
         controller.moveCamera(
-          CameraUpdate.newLatLngBounds(_boundsFor(allPoints), 56),
+          CameraUpdate.newLatLngBounds(_boundsFor(_focusPoints(selected)), 56),
         );
       },
     );
@@ -414,27 +493,214 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
-  // --- FASTEST card -------------------------------------------------------
+  // --- Suggestion list --------------------------------------------------------
 
-  Widget _buildFastestCard(OptimizationResult result) {
-    final best = result.best;
-    final passengerLine = best.stayPut
+  IconData _suggestionIcon(PickupSuggestion suggestion) {
+    if (suggestion.stayPut) return Icons.hail_rounded;
+    switch (suggestion.mode!) {
+      case MobilityMode.walking:
+        return Icons.directions_walk_rounded;
+      case MobilityMode.bicycle:
+        return Icons.directions_bike_rounded;
+      case MobilityMode.transit:
+        return Icons.directions_transit_rounded;
+    }
+  }
+
+  Widget _buildSuggestionList(OptimizationResult result, int selectedIndex) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 6, bottom: 8),
+          child: Text(
+            'SUGGESTIONS',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.65),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ),
+        for (var i = 0; i < result.suggestions.length; i++) ...[
+          _suggestionTile(result, i, i == selectedIndex),
+          if (i + 1 < result.suggestions.length) const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+
+  Widget _suggestionTile(
+    OptimizationResult result,
+    int index,
+    bool isSelected,
+  ) {
+    final suggestion = result.suggestions[index];
+    final title = suggestion.stayPut
+        ? 'Stay put'
+        : '${suggestion.mode!.displayName} '
+              '${suggestion.passengerEtaMin.ceil()} min';
+    final subtitle = suggestion.stayPut
+        ? 'Wait — the driver comes to you'
+        : 'Meet at ${suggestion.meetingPointName}';
+
+    return InkWell(
+      onTap: () => _selectSuggestion(result, index),
+      borderRadius: BorderRadius.circular(18),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? _selectionTeal.withValues(alpha: 0.30)
+              : Colors.white.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected
+                ? _selectionTeal.withValues(alpha: 0.85)
+                : Colors.white.withValues(alpha: 0.14),
+            width: isSelected ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: isSelected ? 0.22 : 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _suggestionIcon(suggestion),
+                color: const Color(0xFFD9FFF4),
+                size: 21,
+              ),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFEFFFF8),
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (suggestion.recommended) ...[
+                        const SizedBox(width: 7),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _cardGreenBottom,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'FASTEST',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.62),
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${suggestion.completionMin.ceil()} min',
+                  style: const TextStyle(
+                    color: Color(0xFFEFFFF8),
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  suggestion.stayPut
+                      ? 'baseline'
+                      : 'driver −${suggestion.driverSavedMin.round()} min',
+                  style: TextStyle(
+                    color: suggestion.stayPut
+                        ? Colors.white.withValues(alpha: 0.55)
+                        : const Color(0xFF8FF3CB),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Detail card ------------------------------------------------------------
+
+  Widget _buildDetailCard(PickupSuggestion selected) {
+    final title = selected.recommended
+        ? 'FASTEST'
+        : selected.stayPut
+        ? 'STAY PUT'
+        : 'ALTERNATIVE';
+    final gradientColors = selected.recommended
+        ? const [_cardGreenTop, _cardGreenBottom]
+        : const [_cardSlateTop, _cardSlateBottom];
+    final textColor = selected.recommended
+        ? const Color(0xFF0E3D2C)
+        : const Color(0xFFEAF3FF);
+
+    final passengerLine = selected.stayPut
         ? 'Passenger: Stay at the pickup point'
-        : 'Passenger: ${best.mode!.verb} ${best.passengerEtaMin.ceil()} mins '
-            'to ${best.meetingPointName}';
-    final driverLine = best.stayPut
-        ? 'Driver: Arrive in ${best.driverEtaMin.ceil()} mins — the direct '
-            'route is already fastest'
-        : 'Driver: Save ${best.driverSavedMin.round()} mins driving time';
+        : 'Passenger: ${selected.mode!.verb} '
+              '${selected.passengerEtaMin.ceil()} mins '
+              'to ${selected.meetingPointName}';
+    final driverLine = selected.stayPut
+        ? 'Driver: Arrive in ${selected.driverEtaMin.ceil()} mins'
+              '${selected.recommended ? ' — the direct route is already fastest' : ''}'
+        : 'Driver: Save ${selected.driverSavedMin.round()} mins driving time';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [_cardGreenTop, _cardGreenBottom],
+          colors: gradientColors,
         ),
         border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
         boxShadow: [
@@ -448,9 +714,9 @@ class _ResultPageState extends State<ResultPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'FASTEST',
-            style: TextStyle(
+          Text(
+            title,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 26,
               fontWeight: FontWeight.w700,
@@ -460,8 +726,8 @@ class _ResultPageState extends State<ResultPage> {
           const SizedBox(height: 8),
           Text(
             passengerLine,
-            style: const TextStyle(
-              color: Color(0xFF0E3D2C),
+            style: TextStyle(
+              color: textColor,
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
@@ -469,8 +735,8 @@ class _ResultPageState extends State<ResultPage> {
           const SizedBox(height: 5),
           Text(
             driverLine,
-            style: const TextStyle(
-              color: Color(0xFF0E3D2C),
+            style: TextStyle(
+              color: textColor,
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
@@ -482,10 +748,10 @@ class _ResultPageState extends State<ResultPage> {
 
   // --- Meeting location card ----------------------------------------------
 
-  Widget _buildMeetingLocationCard(OptimizationResult result) {
-    final best = result.best;
-    final showAddress = best.meetingPointAddress.trim().isNotEmpty &&
-        best.meetingPointAddress != best.meetingPointName;
+  Widget _buildMeetingLocationCard(PickupSuggestion selected) {
+    final showAddress =
+        selected.meetingPointAddress.trim().isNotEmpty &&
+        selected.meetingPointAddress != selected.meetingPointName;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
@@ -523,7 +789,7 @@ class _ResultPageState extends State<ResultPage> {
             child: Column(
               children: [
                 Text(
-                  best.meetingPointName,
+                  selected.meetingPointName,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(0xFF3A2A35),
@@ -534,7 +800,7 @@ class _ResultPageState extends State<ResultPage> {
                 if (showAddress) ...[
                   const SizedBox(height: 3),
                   Text(
-                    best.meetingPointAddress,
+                    selected.meetingPointAddress,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: const Color(0xFF3A2A35).withValues(alpha: 0.7),
@@ -552,14 +818,14 @@ class _ResultPageState extends State<ResultPage> {
 
   // --- Actions --------------------------------------------------------------
 
-  Widget _buildActions(OptimizationResult result) {
+  Widget _buildActions(PickupSuggestion selected) {
     return Row(
       children: [
         Expanded(
           child: _actionButton(
             label: 'Share',
             color: _sharePurple,
-            onPressed: () => _shareSummary(result),
+            onPressed: () => _shareSummary(selected),
           ),
         ),
         const SizedBox(width: 12),
@@ -567,7 +833,7 @@ class _ResultPageState extends State<ResultPage> {
           child: _actionButton(
             label: 'Open in Maps',
             color: _openBlue,
-            onPressed: () => _openInMaps(result),
+            onPressed: () => _openInMaps(selected),
           ),
         ),
       ],
@@ -595,26 +861,25 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
-  String _mapsUrl(OptimizationResult result) {
-    final point = result.best.meetingPoint;
-    final name = Uri.encodeComponent(result.best.meetingPointName);
+  String _mapsUrl(PickupSuggestion selected) {
+    final point = selected.meetingPoint;
+    final name = Uri.encodeComponent(selected.meetingPointName);
     return 'https://uri.amap.com/marker?position=${point.longitude},'
         '${point.latitude}&name=$name&src=pickup-op';
   }
 
-  Future<void> _shareSummary(OptimizationResult result) async {
-    final best = result.best;
+  Future<void> _shareSummary(PickupSuggestion selected) async {
     final lines = <String>[
       'Pickup plan — Picking-Up Optimization',
-      'Meet at: ${best.meetingPointName}',
-      if (best.meetingPointAddress != best.meetingPointName)
-        'Address: ${best.meetingPointAddress}',
-      if (!best.stayPut && best.mode != null)
-        'Passenger: ${best.mode!.verb.toLowerCase()} '
-            '~${best.passengerEtaMin.ceil()} min',
-      'Driver: arrives in ~${best.driverEtaMin.ceil()} min'
-          '${best.stayPut ? '' : ', saves ~${best.driverSavedMin.round()} min'}',
-      _mapsUrl(result),
+      'Meet at: ${selected.meetingPointName}',
+      if (selected.meetingPointAddress != selected.meetingPointName)
+        'Address: ${selected.meetingPointAddress}',
+      if (!selected.stayPut && selected.mode != null)
+        'Passenger: ${selected.mode!.verb.toLowerCase()} '
+            '~${selected.passengerEtaMin.ceil()} min',
+      'Driver: arrives in ~${selected.driverEtaMin.ceil()} min'
+          '${selected.stayPut ? '' : ', saves ~${selected.driverSavedMin.round()} min'}',
+      _mapsUrl(selected),
     ];
     await Clipboard.setData(ClipboardData(text: lines.join('\n')));
     if (!mounted) return;
@@ -626,9 +891,9 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
-  Future<void> _openInMaps(OptimizationResult result) async {
+  Future<void> _openInMaps(PickupSuggestion selected) async {
     final ok = await launchUrl(
-      Uri.parse(_mapsUrl(result)),
+      Uri.parse(_mapsUrl(selected)),
       mode: LaunchMode.externalApplication,
     );
     if (!ok && mounted) {
@@ -755,9 +1020,9 @@ class _RoutePreviewPainter extends CustomPainter {
     final offsetY = (size.height - spanY * scale) / 2;
 
     return (LatLng p) => Offset(
-          offsetX + (p.longitude - minLon) * lonScale * scale,
-          offsetY + (maxLat - p.latitude) * scale,
-        );
+      offsetX + (p.longitude - minLon) * lonScale * scale,
+      offsetY + (maxLat - p.latitude) * scale,
+    );
   }
 
   Path _toPath(List<LatLng> points, Offset Function(LatLng) project) {

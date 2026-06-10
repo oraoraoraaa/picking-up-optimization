@@ -7,26 +7,96 @@ import 'package:pickup_op_flutter/src/result_page.dart';
 
 const _driver = LatLng(31.2454, 121.5086); // Lujiazui
 const _passenger = LatLng(31.2304, 121.4737); // People's Square
+const _meetingA = LatLng(31.2381, 121.4849);
+const _meetingB = LatLng(31.2400, 121.4905);
 
-OptimizationResult _fakeResult({bool stayPut = false}) {
-  const meeting = LatLng(31.2381, 121.4849);
+PickupSuggestion _modeSuggestion({
+  required MobilityMode mode,
+  required bool recommended,
+  required LatLng meetingPoint,
+  required String name,
+  required double driverEtaMin,
+  required double passengerEtaMin,
+}) {
+  return PickupSuggestion(
+    stayPut: false,
+    mode: mode,
+    recommended: recommended,
+    meetingPoint: meetingPoint,
+    meetingPointName: name,
+    meetingPointAddress: 'Huangpu District, Shanghai',
+    driverEtaMin: driverEtaMin,
+    passengerEtaMin: passengerEtaMin,
+    completionMin:
+        driverEtaMin > passengerEtaMin ? driverEtaMin : passengerEtaMin,
+    driverSavedMin: 14 - driverEtaMin,
+    score: scoreOption(driverEtaMin, passengerEtaMin, mode),
+    driverRoutePolyline: [_driver, meetingPoint],
+    passengerPathPolyline: [_passenger, meetingPoint],
+  );
+}
+
+PickupSuggestion _stayPutSuggestion({required bool recommended}) {
+  return PickupSuggestion(
+    stayPut: true,
+    mode: null,
+    recommended: recommended,
+    meetingPoint: _passenger,
+    meetingPointName: "People's Square",
+    meetingPointAddress: 'Huangpu District, Shanghai',
+    driverEtaMin: 14,
+    passengerEtaMin: 0,
+    completionMin: 14,
+    driverSavedMin: 0,
+    score: 14,
+    driverRoutePolyline: const [_driver, _passenger],
+    passengerPathPolyline: const <LatLng>[],
+  );
+}
+
+OptimizationResult _fakeResult({bool stayPutWins = false}) {
   return OptimizationResult(
     dataSource: 'fallback',
     baselineDriverEtaMin: 14,
-    best: PickupRecommendation(
-      stayPut: stayPut,
-      meetingPoint: stayPut ? _passenger : meeting,
-      meetingPointName: stayPut ? "People's Square" : 'Nanjing East Rd',
-      meetingPointAddress: 'Huangpu District, Shanghai',
-      mode: stayPut ? null : MobilityMode.walking,
-      driverEtaMin: stayPut ? 14 : 7,
-      passengerEtaMin: stayPut ? 0 : 5,
-      completionMin: stayPut ? 14 : 7,
-      driverSavedMin: stayPut ? 0 : 7,
-    ),
-    driverRoutePolyline: [_driver, if (!stayPut) meeting else _passenger],
-    passengerPathPolyline:
-        stayPut ? const <LatLng>[] : const [_passenger, meeting],
+    suggestions: stayPutWins
+        ? [
+            _stayPutSuggestion(recommended: true),
+            _modeSuggestion(
+              mode: MobilityMode.walking,
+              recommended: false,
+              meetingPoint: _meetingA,
+              name: 'Nanjing East Rd',
+              driverEtaMin: 13,
+              passengerEtaMin: 6,
+            ),
+          ]
+        : [
+            _modeSuggestion(
+              mode: MobilityMode.walking,
+              recommended: true,
+              meetingPoint: _meetingA,
+              name: 'Nanjing East Rd',
+              driverEtaMin: 7,
+              passengerEtaMin: 5,
+            ),
+            _modeSuggestion(
+              mode: MobilityMode.bicycle,
+              recommended: false,
+              meetingPoint: _meetingB,
+              name: 'The Bund',
+              driverEtaMin: 6,
+              passengerEtaMin: 8,
+            ),
+            _modeSuggestion(
+              mode: MobilityMode.transit,
+              recommended: false,
+              meetingPoint: _meetingB,
+              name: 'The Bund',
+              driverEtaMin: 6,
+              passengerEtaMin: 12,
+            ),
+            _stayPutSuggestion(recommended: false),
+          ],
   );
 }
 
@@ -40,7 +110,7 @@ void main() {
       apiKey: '',
     );
 
-    testWidgets('renders the design cards for a switch recommendation', (
+    testWidgets('renders one suggestion per mode plus stay-put', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
@@ -53,26 +123,62 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('FASTEST'), findsOneWidget);
-      expect(find.text('MEETING UP LOCATION:'), findsOneWidget);
-      expect(find.text('Nanjing East Rd'), findsOneWidget);
+      expect(find.text('SUGGESTIONS'), findsOneWidget);
+      expect(find.text('Walk 5 min'), findsOneWidget);
+      expect(find.text('Bicycle 8 min'), findsOneWidget);
+      expect(find.text('Transit 12 min'), findsOneWidget);
+      expect(find.text('Stay put'), findsOneWidget);
+      // Badge on the recommended tile + detail card title.
+      expect(find.text('FASTEST'), findsNWidgets(2));
       expect(
         find.text('Passenger: Walk 5 mins to Nanjing East Rd'),
         findsOneWidget,
       );
       expect(find.text('Driver: Save 7 mins driving time'), findsOneWidget);
+      expect(find.text('MEETING UP LOCATION:'), findsOneWidget);
       expect(find.text('Share'), findsOneWidget);
       expect(find.text('Open in Maps'), findsOneWidget);
     });
 
-    testWidgets('renders a stay-put recommendation', (
+    testWidgets('tapping a suggestion switches the detail cards', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: ResultPage(
             request: request,
-            runOptimization: (_) async => _fakeResult(stayPut: true),
+            runOptimization: (_) async => _fakeResult(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Transit 12 min'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ALTERNATIVE'), findsOneWidget);
+      expect(
+        find.text('Passenger: Take transit 12 mins to The Bund'),
+        findsOneWidget,
+      );
+      expect(find.text('Driver: Save 8 mins driving time'), findsOneWidget);
+
+      await tester.tap(find.text('Stay put'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('STAY PUT'), findsOneWidget);
+      expect(find.text('Passenger: Stay at the pickup point'), findsOneWidget);
+      expect(find.text('Driver: Arrive in 14 mins'), findsOneWidget);
+    });
+
+    testWidgets('renders a stay-put recommendation first', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ResultPage(
+            request: request,
+            runOptimization: (_) async => _fakeResult(stayPutWins: true),
           ),
         ),
       );
@@ -103,7 +209,7 @@ void main() {
 
       expect(find.text('Optimizing your pickup...'), findsOneWidget);
       await tester.pumpAndSettle();
-      expect(find.text('FASTEST'), findsOneWidget);
+      expect(find.text('SUGGESTIONS'), findsOneWidget);
     });
   });
 
@@ -124,6 +230,36 @@ void main() {
       final transit = scoreOption(10, 5, MobilityMode.transit);
       expect(walk, lessThan(bike));
       expect(bike, lessThan(transit));
+    });
+
+    test('bestPerMode keeps the first occurrence per mode in rank order', () {
+      EvaluatedOption option(MobilityMode mode, double score) {
+        return EvaluatedOption(
+          routeIndex: 0,
+          meetingPoint: _meetingA,
+          mode: mode,
+          driverEtaMin: score,
+          passengerEtaMin: 1,
+          score: score,
+        );
+      }
+
+      final ranked = [
+        option(MobilityMode.bicycle, 8),
+        option(MobilityMode.walking, 9),
+        option(MobilityMode.bicycle, 10),
+        option(MobilityMode.transit, 11),
+        option(MobilityMode.walking, 12),
+      ];
+      final winners = bestPerMode(ranked);
+
+      expect(winners.length, 3);
+      expect(winners[0].mode, MobilityMode.bicycle);
+      expect(winners[0].score, 8);
+      expect(winners[1].mode, MobilityMode.walking);
+      expect(winners[1].score, 9);
+      expect(winners[2].mode, MobilityMode.transit);
+      expect(bestPerMode(const []), isEmpty);
     });
 
     test('candidate generation respects reach, spacing, and cap', () {

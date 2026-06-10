@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:amap_map/amap_map.dart';
 import 'package:http/http.dart' as http;
@@ -65,15 +67,18 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  static const Duration _uiAnimDuration = Duration(milliseconds: 260);
-  static const Duration _uiAnimFastDuration = Duration(milliseconds: 180);
+  static const Duration _uiAnimDuration = Duration(milliseconds: 240);
+  static const Duration _uiAnimFastDuration = Duration(milliseconds: 160);
 
   static const CameraPosition _defaultCamera = CameraPosition(
     target: LatLng(39.909187, 116.397451),
     zoom: 11.5,
   );
+  static bool _amapInitialized = false;
+
   UserMode _mode = UserMode.driver;
   bool _modeMenuExpanded = false;
+  bool _trafficEnabled = true;
   AMapController? _mapController;
   bool _centeredOnUser = false;
   bool _locationReady = false;
@@ -146,23 +151,63 @@ class _DashboardPageState extends State<DashboardPage> {
         ? "Where's your passenger?"
         : "Where's your driver?";
 
-    if (_supportsAmap) {
+    if (_supportsAmap && !_amapInitialized) {
       AMapInitializer.init(context, apiKey: amapApiKeys);
       AMapInitializer.updatePrivacyAgree(amapPrivacyStatement);
+      _amapInitialized = true;
     }
 
-    return Scaffold(
-      body: SafeArea(
-        child: GestureDetector(
+    final mapActive = _supportsAmap && _hasConfiguredApiKey;
+    // The map runs edge-to-edge; floating widgets respect the safe insets
+    // themselves so no letterboxing bars appear above/below the map.
+    final safe = MediaQuery.paddingOf(context);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Light map under a transparent status bar -> dark status bar icons.
+      value: mapActive && _locationReady
+          ? SystemUiOverlayStyle.dark
+          : SystemUiOverlayStyle.light,
+      child: Scaffold(
+        body: GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
           child: Stack(
             children: [
               Positioned.fill(child: _buildMapBackground()),
-              Positioned(top: 20, right: 20, child: _buildModeSelector()),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: safe.top + 46,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.22),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: safe.top + 10,
+                right: 16,
+                child: _buildModeSelector(),
+              ),
+              if (mapActive && _locationReady)
+                Positioned(
+                  top: safe.top + 10,
+                  left: 14,
+                  child: _buildMapActions(),
+                ),
               Positioned(
                 left: 14,
                 right: 14,
-                bottom: 16,
+                bottom: math.max(safe.bottom, 10) + 6,
                 child: _buildBottomPanel(prompt),
               ),
             ],
@@ -172,13 +217,78 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Widget _buildMapActions() {
+    return Column(
+      children: [
+        _mapActionButton(
+          icon: Icons.traffic_rounded,
+          active: _trafficEnabled,
+          onTap: () => setState(() => _trafficEnabled = !_trafficEnabled),
+        ),
+        const SizedBox(height: 10),
+        _mapActionButton(
+          icon: Icons.my_location_rounded,
+          onTap: _recenterOnUser,
+        ),
+      ],
+    );
+  }
+
+  Widget _mapActionButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    bool active = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: _uiAnimFastDuration,
+        curve: Curves.easeOutCubic,
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: active
+              ? const Color(0xFF58BFB7).withValues(alpha: 0.95)
+              : Colors.white.withValues(alpha: 0.92),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          size: 21,
+          color: active ? Colors.white : const Color(0xFF2A5D66),
+        ),
+      ),
+    );
+  }
+
+  void _recenterOnUser() {
+    final location = _latestUserLocation;
+    final controller = _mapController;
+    if (location == null || controller == null) {
+      _showHint('Still locating you — one moment.');
+      return;
+    }
+    controller.moveCamera(
+      CameraUpdate.newLatLngZoom(location, 15.5),
+      duration: 350,
+    );
+  }
+
   Widget _buildMapBackground() {
     if (_supportsAmap && _hasConfiguredApiKey) {
       return Stack(
         children: [
           AMapWidget(
             initialCameraPosition: _defaultCamera,
-            trafficEnabled: true,
+            trafficEnabled: _trafficEnabled,
             scaleEnabled: false,
             compassEnabled: false,
             markers: _selectedMarkers,
@@ -306,18 +416,31 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _buildModeSelector() {
     return AnimatedSize(
       duration: _uiAnimDuration,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeOutQuart,
+      alignment: Alignment.topRight,
       child: AnimatedSwitcher(
         duration: _uiAnimDuration,
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
+        layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+          // Anchor both states to the top-right corner so the expansion grows
+          // out of the collapsed chip instead of jumping around its center.
+          return Stack(
+            alignment: Alignment.topRight,
+            children: <Widget>[...previousChildren, ?currentChild],
+          );
+        },
         transitionBuilder: (Widget child, Animation<double> animation) {
-          final scale = Tween<double>(begin: 0.94, end: 1.0).animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+          final scale = Tween<double>(begin: 0.96, end: 1.0).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
           );
           return FadeTransition(
             opacity: animation,
-            child: ScaleTransition(scale: scale, child: child),
+            child: ScaleTransition(
+              scale: scale,
+              alignment: Alignment.topRight,
+              child: child,
+            ),
           );
         },
         child: _modeMenuExpanded
@@ -433,86 +556,93 @@ class _DashboardPageState extends State<DashboardPage> {
     return _glassCard(
       borderRadius: 30,
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Pick up Optimization',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF06243C),
+      // Animate panel height changes (e.g. the suggestion dropdown appearing)
+      // instead of snapping.
+      child: AnimatedSize(
+        duration: _uiAnimDuration,
+        curve: Curves.easeOutQuart,
+        alignment: Alignment.topCenter,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Pick up Optimization',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF06243C),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          AnimatedSwitcher(
-            duration: _uiAnimDuration,
-            transitionBuilder: (Widget child, Animation<double> animation) {
-              final slide =
-                  Tween<Offset>(
-                    begin: const Offset(0, 0.22),
-                    end: Offset.zero,
-                  ).animate(
-                    CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                    ),
-                  );
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(position: slide, child: child),
-              );
-            },
-            child: Text(
-              prompt,
-              key: ValueKey<String>(prompt),
-              style: const TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
+            const SizedBox(height: 8),
+            AnimatedSwitcher(
+              duration: _uiAnimDuration,
+              transitionBuilder: (Widget child, Animation<double> animation) {
+                final slide =
+                    Tween<Offset>(
+                      begin: const Offset(0, 0.22),
+                      end: Offset.zero,
+                    ).animate(
+                      CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOutCubic,
+                      ),
+                    );
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(position: slide, child: child),
+                );
+              },
+              child: Text(
+                prompt,
+                key: ValueKey<String>(prompt),
+                style: const TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          _searchBar(
-            controller: _pickupController,
-            focusNode: _pickupFocusNode,
-            hint: 'Search for a place or address',
-            field: _SearchField.pickup,
-          ),
-          const SizedBox(height: 7),
-          const Text(
-            'Starting from a different location?',
-            style: TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
-          ),
-          const SizedBox(height: 8),
-          _searchBar(
-            controller: _startController,
-            focusNode: _startFocusNode,
-            hint: 'Search your start point',
-            field: _SearchField.start,
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _startOptimizing,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(
-                  0xFF5FC99E,
-                ).withValues(alpha: 0.94),
-                foregroundColor: const Color(0xFFEFFFF8),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+            const SizedBox(height: 8),
+            _searchBar(
+              controller: _pickupController,
+              focusNode: _pickupFocusNode,
+              hint: 'Search for a place or address',
+              field: _SearchField.pickup,
+            ),
+            const SizedBox(height: 7),
+            const Text(
+              'Starting from a different location?',
+              style: TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
+            ),
+            const SizedBox(height: 8),
+            _searchBar(
+              controller: _startController,
+              focusNode: _startFocusNode,
+              hint: 'Search your start point',
+              field: _SearchField.start,
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _startOptimizing,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(
+                    0xFF5FC99E,
+                  ).withValues(alpha: 0.94),
+                  foregroundColor: const Color(0xFFEFFFF8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.24)),
+                  elevation: 0,
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.24)),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Start Route Optimizing',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                child: const Text(
+                  'Start Route Optimizing',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1325,7 +1455,9 @@ class _DashboardPageState extends State<DashboardPage> {
     return ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        // Moderate blur: visually identical on glass cards but measurably
+        // cheaper than the previous sigma 16 on devices.
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           width: width,
           padding: padding,

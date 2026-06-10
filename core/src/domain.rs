@@ -74,22 +74,37 @@ pub struct EvaluatedOption {
     pub score: f64,
 }
 
+/// One displayable meeting plan: the best evaluated option for one passenger
+/// mode, carrying everything the UI needs to render it standalone.
 #[derive(Clone, Debug, Serialize)]
-pub struct Recommendation {
-    pub stay_put: bool,
+pub struct Suggestion {
+    pub mode: MobilityMode,
+    /// True on the single suggestion that beats stay-put per the engine's
+    /// decision rule (at most one across the whole set).
+    pub recommended: bool,
     pub meeting_point: GeoPoint,
-    pub mode: Option<MobilityMode>,
     pub driver_eta_min: f64,
     pub passenger_eta_min: f64,
     pub completion_min: f64,
     pub driver_saved_min: f64,
+    pub score: f64,
     pub rationale: String,
+    /// Driver start -> this suggestion's meeting point.
+    pub driver_route_polyline: Vec<GeoPoint>,
+    /// Passenger start -> this suggestion's meeting point.
+    pub passenger_path_polyline: Vec<GeoPoint>,
 }
 
+/// The "do nothing" plan: driver goes all the way to the passenger.
 #[derive(Clone, Debug, Serialize)]
-pub struct BaselineOption {
+pub struct StayPutSuggestion {
+    /// True when no alternative clears the improvement bar.
+    pub recommended: bool,
     pub driver_eta_min: f64,
     pub completion_min: f64,
+    pub rationale: String,
+    /// Driver start -> passenger (full route).
+    pub driver_route_polyline: Vec<GeoPoint>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -98,13 +113,10 @@ pub struct RecommendationSet {
     pub data_source: String,
     pub passenger_start: NamedPoint,
     pub driver_start: NamedPoint,
-    pub baseline: BaselineOption,
-    pub best: Recommendation,
-    pub alternatives: Vec<Recommendation>,
-    /// Driver start -> recommended meeting point.
-    pub driver_route_polyline: Vec<GeoPoint>,
-    /// Passenger start -> recommended meeting point (empty when staying put).
-    pub passenger_path_polyline: Vec<GeoPoint>,
+    pub stay_put: StayPutSuggestion,
+    /// Per-mode winners in rank order (best overall first); may be empty when
+    /// no candidate is reachable.
+    pub suggestions: Vec<Suggestion>,
 }
 
 /// CLI / bridge input contract.

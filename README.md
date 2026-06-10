@@ -40,7 +40,7 @@ This repository contains a working end-to-end demo:
 
 - Dashboard with live AMap, driver/passenger modes, and POI search ([design](resource/images/design/dashboard_v1.png))
 - Route-interception optimization: meeting points are generated along the driver's inbound route, evaluated across walking/bicycle/transit, scored, and compared against staying put
-- Result screen with route preview, `FASTEST` summary, meeting-up location, Share, and Open in Maps ([design](resource/images/design/result_v1.png))
+- Result screen with route preview, a per-mode suggestion list (walk / bicycle / transit / stay put, v2), `FASTEST` summary, meeting-up location, Share, and Open in Maps ([design](resource/images/design/result_v1.png))
 - The algorithm's reference implementation lives in the Rust core (`core/`, unit-tested, runnable as a CLI); the app runs a documented on-device Dart mirror of it until the FFI bridge lands
 
 #### Run the App (iOS / Android)

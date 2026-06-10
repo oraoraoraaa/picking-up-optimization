@@ -333,3 +333,79 @@ Result page contents (per design):
 - Header shows a data-source badge: `Live traffic` / `Live + estimates` / `Estimates only`.
 
 Verification: `flutter analyze` clean, `flutter test` 6/6 passing, `flutter build macos --debug` succeeds, `cargo test` 10/10 passing.
+
+## V2: Multi-Suggestion Results (Walk / Bicycle / Transit / Stay Put)
+
+### Implementation Update (2026-06-10, Per-Mode Suggestions in the Core)
+
+Extended the Rust core so a single analysis returns one displayable plan per passenger mode instead of only the overall best.
+
+Files modified:
+
+- `core/src/engine.rs`: added `best_per_mode(ranked)` — reduces the ranked option list to the best-scored option per mode while preserving rank order (the first occurrence of each mode is that mode's winner since the input is sorted). Two new unit tests (12 total).
+- `core/src/amap.rs`: added `fetch_bicycling_path` (duration + step polylines from the v4 bicycling API); bicycle durations now reuse it.
+- `core/src/domain.rs`: replaced the v1 `best`/`alternatives` output with the v2 schema:
+  - `Suggestion` — one per-mode plan carrying `mode`, `recommended`, meeting point, driver/passenger/completion ETAs, `driver_saved_min`, `score`, rationale, and its own `driver_route_polyline` (truncated at that plan's meeting point) + `passenger_path_polyline`.
+  - `StayPutSuggestion` — the baseline plan with the full driver route polyline.
+  - `RecommendationSet` — `{ stay_put, suggestions: [...] }`; exactly one entry across both carries `recommended: true`.
+- `core/src/lib.rs`: orchestrator builds per-mode winners via `best_per_mode`, fetches per-suggestion passenger paths (walking and bicycling via real path APIs, transit as a straight line), and sets the recommended flag from the existing `decide` rule (per-mode winners preserve rank order, so when a switch wins it is exactly the first winner).
+
+### Implementation Update (2026-06-10, Multi-Suggestion Result UI)
+
+The result page now presents all options — passenger walking, bicycle, transit, and stay put — as a tappable list.
+
+Files modified:
+
+- `app/flutter/lib/src/pickup_optimizer.dart`:
+  - Added `bestPerMode` (mirrors `engine::best_per_mode`).
+  - `PickupSuggestion` replaces the single recommendation model; the stay-put plan is folded in as a suggestion with `mode == null`. Each suggestion carries its own polylines and a reverse-geocoded name/address (the regeo helper now returns both a POI name and a formatted address).
+  - `OptimizationResult.suggestions` lists the recommended entry first, the rest ascending by score; stay-put is always present.
+  - Bicycle suggestions now use the real v4 bicycling path polyline (shared `_fetchPathPolyline` helper); transit remains a straight dashed line.
+- `app/flutter/lib/src/result_page.dart`:
+  - New `SUGGESTIONS` section between the map and detail cards: one tile per plan with mode icon, passenger time (`Walk 5 min`), meeting point name, total completion time, driver saving (`driver −7 min`), and a green `FASTEST` badge on the recommended plan.
+  - Tapping a tile selects it: the map redraws that plan's polylines/markers and refits the camera (`AMapController` retained for `newLatLngBounds` moves), and the detail/meeting/action cards switch to the selection.
+  - Detail card title reflects the selection: `FASTEST` (green gradient) for the recommended plan, `ALTERNATIVE` / `STAY PUT` (slate gradient) otherwise.
+  - Share / Open in Maps act on the currently selected suggestion.
+- `app/flutter/test/widget_test.dart`: updated for the v2 model — verifies one tile per mode plus stay-put, the FASTEST badge, tap-to-switch behavior across detail cards, the stay-put-wins layout, and the `bestPerMode` port.
+
+Verification: `cargo test` 12/12, clippy clean; `flutter analyze` clean, `flutter test` 8/8, `flutter build macos --debug` succeeds. CLI smoke run (fallback mode) returns bicycle (recommended) + walking + transit suggestions with per-suggestion polylines.
+
+### Implementation Update (2026-06-10, Edge-to-Edge Dashboard, Result Map Gestures, UX/Perf Polish)
+
+Files modified:
+
+- `app/flutter/lib/main.dart`
+- `app/flutter/lib/src/result_page.dart`
+
+**Dashboard letterboxing fix (black bars):**
+
+- Removed the full-screen `SafeArea` that was insetting the whole dashboard body and exposing the dark scaffold background above/below the map on notched iPhones.
+- The map now renders edge-to-edge; floating widgets (mode selector, map action buttons, bottom panel) position themselves with `MediaQuery.paddingOf` safe insets instead.
+- Added a subtle top gradient scrim under the status bar for legibility, and an `AnnotatedRegion<SystemUiOverlayStyle>` that switches status bar icons to dark over the light map (light while the loading overlay/fallback background shows).
+
+**Dashboard new functions + beautification:**
+
+- Added two floating circular map action buttons (top-left, mirroring the mode selector):
+  - Traffic toggle: switches the AMap real-time traffic layer on/off (`trafficEnabled` is now state).
+  - Recenter: animates the camera back to the user's current location (hint snackbar when location isn't available yet).
+- Buttons use solid translucent fills (no extra `BackdropFilter` cost) with an active-state teal tint.
+
+**Result page map gesture fix:**
+
+- The route preview `AMapWidget` sits inside a `SingleChildScrollView`, which was claiming vertical drags before the platform view saw them (taps/double-taps worked, panning didn't).
+- Fixed by passing `gestureRecognizers: {Factory(EagerGestureRecognizer.new)}` so the map claims drags eagerly; panning now moves the map and page scrolling happens outside the map card.
+
+**Animation smoothness:**
+
+- Mode selector now expands out of its top-right corner: `AnimatedSize`/`AnimatedSwitcher` share a top-right alignment (custom `layoutBuilder` + anchored `ScaleTransition`) instead of growing from the center.
+- Bottom panel height changes (suggestion dropdown appearing/disappearing) animate via an `AnimatedSize` wrapper instead of snapping.
+- Result page detail + meeting-location cards cross-fade/slide via a keyed `AnimatedSwitcher` when a different suggestion is selected.
+- Standard durations tightened to 240ms/160ms with `easeOutQuart`/`easeOutCubic` curves.
+
+**Lightweight optimizations:**
+
+- `AMapInitializer.init`/`updatePrivacyAgree` now run once (guarded) instead of on every dashboard rebuild.
+- Glass-card `BackdropFilter` blur sigma reduced 16 -> 10 (visually equivalent, cheaper to composite over the map).
+- `RepaintBoundary` around the schematic route preview painter so page scrolling doesn't re-rasterize it.
+
+Verification: `dart format` applied, `flutter analyze` clean, `flutter test` 8/8, `flutter build macos --debug` succeeds.
