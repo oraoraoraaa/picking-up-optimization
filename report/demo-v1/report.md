@@ -68,23 +68,23 @@ Demo 的核心不是简单调用地图 API，而是实现了一个完整的会�
 
 | | |
 | :---: | :---: |
-| ![首页仪表盘](images/demo-0-home.png) | ![模式选择](images/demo-1-mode-selection.png) |
+| ![首页仪表盘](images/demo-v1-0-home.png) | ![模式选择](images/demo-v1-1-mode-selection.png) |
 | 图 1：首页仪表盘（司机模式，实时路况） | 图 2：模式选择浮窗 |
-| ![地图点选乘客位置](images/demo-2-poi-selection.png) | ![优化计算中](images/demo-3-optimizing.png) |
+| ![地图点选乘客位置](images/demo-v1-2-poi-selection.png) | ![优化计算中](images/demo-v1-3-optimizing.png) |
 | 图 3：地图点选 POI 设定乘客位置（西安电子科技大学雁塔校区） | 图 4：优化计算中（拉取路况与候选会合点） |
-| ![优化结果页](images/demo-4-result-dashboard.png) | ![分享摘要](images/demo-5-share.png) |
+| ![优化结果页](images/demo-v1-4-result-dashboard.png) | ![分享摘要](images/demo-v1-5-share.png) |
 | 图 5：结果页——推荐乘客骑行 15 分钟至"里奥精品酒店(西安钟楼丰庆路店)"，司机节省 14 分钟车程 | 图 6：Share 复制的方案摘要（含高德链接） |
 
 | |
 | :---: |
-| ![跳转高德地图](images/demo-6-open-in-map.png) |
+| ![跳转高德地图](images/demo-v1-6-open-in-map.png) |
 | 图 7：Open in Maps 跳转高德，定位会合点 |
 
 **实测验证（高德导航交叉对比）：**
 
 | | | |
 | :---: | :---: | :---: |
-| ![司机直接接驾](images/demo-9-actual-drive-no-op.png) | ![司机至会合点](images/demo-7-actual-drive-op.png) | ![乘客骑行至会合点](images/demo-8-actual-bicycle-op.png) |
+| ![司机直接接驾](images/demo-v1-9-actual-drive-no-op.png) | ![司机至会合点](images/demo-v1-7-actual-drive-op.png) | ![乘客骑行至会合点](images/demo-v1-8-actual-bicycle-op.png) |
 | 图 8：不优化——司机直接开到乘客处需 **28 分钟** | 图 9：优化后——司机开到会合点仅 **14 分钟** | 图 10：乘客骑行至会合点 **16 分钟** |
 
 优化后整体完成时间 ≈ max(14, 16) = **16 分钟**，对比基线 28 分钟节省约 **12 分钟**；高德实测值与 App 推荐值（司机省 14 分钟、骑行约 15 分钟）高度一致，验证了算法与数据链路的正确性。
@@ -133,4 +133,4 @@ Demo 的核心不是简单调用地图 API，而是实现了一个完整的会�
 
 ---
 
-*附：本报告所有截图位于 `report/demo-v1/images/`，均为 iPhone 真机实拍。*
+*附：本报告所有截图位于 `report/demo-v1-v1/images/`，均为 iPhone 真机实拍。*
