@@ -126,8 +126,10 @@ class OptimizationResult {
   /// the rest ascending by score. Never empty (stay-put is always present).
   final List<PickupSuggestion> suggestions;
 
-  PickupSuggestion get recommended =>
-      suggestions.firstWhere((s) => s.recommended, orElse: () => suggestions.first);
+  PickupSuggestion get recommended => suggestions.firstWhere(
+    (s) => s.recommended,
+    orElse: () => suggestions.first,
+  );
 }
 
 class RoutePoint {
@@ -182,7 +184,8 @@ double haversineM(LatLng a, LatLng b) {
   const radiusM = 6371000.0;
   final dLat = _radians(b.latitude - a.latitude);
   final dLon = _radians(b.longitude - a.longitude);
-  final h = math.pow(math.sin(dLat / 2), 2) +
+  final h =
+      math.pow(math.sin(dLat / 2), 2) +
       math.cos(_radians(a.latitude)) *
           math.cos(_radians(b.latitude)) *
           math.pow(math.sin(dLon / 2), 2);
@@ -233,7 +236,9 @@ List<RouteCandidate> generateRouteCandidates(
   final picked = <RouteCandidate>[];
   for (var slot = 0; slot < EngineTuning.maxCandidates; slot++) {
     final index =
-        slot * (spaced.length - 1) ~/ math.max(EngineTuning.maxCandidates - 1, 1);
+        slot *
+        (spaced.length - 1) ~/
+        math.max(EngineTuning.maxCandidates - 1, 1);
     picked.add(spaced[index]);
   }
   return picked;
@@ -276,12 +281,14 @@ double scoreOption(
 /// the best option per mode, preserving rank order.
 List<EvaluatedOption> bestPerMode(List<EvaluatedOption> ranked) {
   final seen = <MobilityMode>{};
-  return ranked.where((option) => seen.add(option.mode)).toList(growable: false);
+  return ranked
+      .where((option) => seen.add(option.mode))
+      .toList(growable: false);
 }
 
 class PickupOptimizer {
   PickupOptimizer({http.Client? httpClient})
-      : _http = httpClient ?? http.Client();
+    : _http = httpClient ?? http.Client();
 
   static const Duration _requestTimeout = Duration(seconds: 8);
   static const double _fallbackDetourFactor = 1.35;
@@ -300,7 +307,8 @@ class PickupOptimizer {
     _usedFallback = false;
     final key = request.apiKey.trim();
 
-    final route = await _fetchDrivingRoute(key, request.driver, request.passenger) ??
+    final route =
+        await _fetchDrivingRoute(key, request.driver, request.passenger) ??
         _fallbackDrivingRoute(request.driver, request.passenger);
 
     final baselineDriverEtaMin = route.totalSecs / 60.0;
@@ -313,7 +321,8 @@ class PickupOptimizer {
         if (mode == MobilityMode.transit && key.isNotEmpty) {
           citycode ??= await _fetchCitycode(key, request.passenger);
         }
-        final passengerSecs = await _fetchPassengerSecs(
+        final passengerSecs =
+            await _fetchPassengerSecs(
               key,
               mode,
               request.passenger,
@@ -346,7 +355,8 @@ class PickupOptimizer {
     });
 
     // Mirrors `engine::decide`: a switch must clearly beat stay-put.
-    final switchWins = evaluated.isNotEmpty &&
+    final switchWins =
+        evaluated.isNotEmpty &&
         evaluated.first.score <=
             baselineDriverEtaMin - EngineTuning.minImprovementMin;
 
@@ -364,14 +374,18 @@ class PickupOptimizer {
           mode: option.mode,
           recommended: switchWins && i == 0,
           meetingPoint: option.meetingPoint,
-          meetingPointName: place.name ?? "a point on the driver's route",
+          // Empty when reverse geocoding failed; the UI substitutes a
+          // localized fallback label.
+          meetingPointName: place.name ?? '',
           meetingPointAddress:
               place.address ?? _coordsLabel(option.meetingPoint),
           driverEtaMin: option.driverEtaMin,
           passengerEtaMin: option.passengerEtaMin,
           completionMin: option.completionMin,
-          driverSavedMin:
-              math.max(baselineDriverEtaMin - option.driverEtaMin, 0),
+          driverSavedMin: math.max(
+            baselineDriverEtaMin - option.driverEtaMin,
+            0,
+          ),
           score: option.score,
           driverRoutePolyline: route.points
               .sublist(0, option.routeIndex + 1)
@@ -402,8 +416,9 @@ class PickupOptimizer {
         completionMin: baselineDriverEtaMin,
         driverSavedMin: 0,
         score: baselineDriverEtaMin,
-        driverRoutePolyline:
-            route.points.map((p) => p.point).toList(growable: false),
+        driverRoutePolyline: route.points
+            .map((p) => p.point)
+            .toList(growable: false),
         passengerPathPolyline: const <LatLng>[],
       ),
     );
@@ -503,7 +518,8 @@ class PickupOptimizer {
       var progress = 0.0;
       for (var i = 0; i < vertices.length; i++) {
         if (i > 0) progress += lengths[i - 1];
-        final isDuplicateJoint = i == 0 &&
+        final isDuplicateJoint =
+            i == 0 &&
             points.isNotEmpty &&
             points.last.point.latitude == vertices[i].latitude &&
             points.last.point.longitude == vertices[i].longitude;
@@ -543,31 +559,31 @@ class PickupOptimizer {
           'destination': _lonLat(to),
           'output': 'JSON',
         });
-        duration =
-            data == null ? null : _path(data, ['route', 'paths', 0, 'duration']);
+        duration = data == null
+            ? null
+            : _path(data, ['route', 'paths', 0, 'duration']);
       case MobilityMode.bicycle:
         final data = await _getJson('/v4/direction/bicycling', <String, String>{
           'key': key,
           'origin': _lonLat(from),
           'destination': _lonLat(to),
         });
-        duration =
-            data == null ? null : _path(data, ['data', 'paths', 0, 'duration']);
+        duration = data == null
+            ? null
+            : _path(data, ['data', 'paths', 0, 'duration']);
       case MobilityMode.transit:
         if (citycode == null) {
           _usedFallback = true;
           return null;
         }
-        final data = await _getJson(
-          '/v3/direction/transit/integrated',
-          <String, String>{
-            'key': key,
-            'origin': _lonLat(from),
-            'destination': _lonLat(to),
-            'city': citycode,
-            'output': 'JSON',
-          },
-        );
+        final data =
+            await _getJson('/v3/direction/transit/integrated', <String, String>{
+              'key': key,
+              'origin': _lonLat(from),
+              'destination': _lonLat(to),
+              'city': citycode,
+              'output': 'JSON',
+            });
         duration = data == null
             ? null
             : _path(data, ['route', 'transits', 0, 'duration']);
@@ -648,8 +664,9 @@ class PickupOptimizer {
       'location': _lonLat(location),
       'output': 'JSON',
     });
-    final citycode =
-        data == null ? null : _path(data, ['regeocode', 'addressComponent', 'citycode']);
+    final citycode = data == null
+        ? null
+        : _path(data, ['regeocode', 'addressComponent', 'citycode']);
     return citycode is String && citycode.isNotEmpty ? citycode : null;
   }
 
@@ -691,7 +708,10 @@ class PickupOptimizer {
     _usedFallback = true;
     const vertices = 32;
     final roadM = haversineM(from, to) * _fallbackDetourFactor;
-    final totalSecs = math.max(roadM / 1000.0 / _fallbackDrivingKmh * 3600.0, 60.0);
+    final totalSecs = math.max(
+      roadM / 1000.0 / _fallbackDrivingKmh * 3600.0,
+      60.0,
+    );
 
     final points = List<RoutePoint>.generate(vertices, (i) {
       final t = i / (vertices - 1);

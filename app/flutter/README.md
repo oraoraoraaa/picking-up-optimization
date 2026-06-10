@@ -10,6 +10,7 @@ Whenever you modify the files in this folder, please update the description belo
 - Optimization service (`lib/src/pickup_optimizer.dart`): on-device port of the Rust core engine (`core/src/engine.rs`) — fetches the driver route and candidate ETAs from AMap Web Services, scores and ranks meeting points, and decides versus staying put. Keep its constants in sync with the Rust `EngineConfig`.
 - Result page (`lib/src/result_page.dart`): the `resource/images/design/result_v1.png` layout extended with a tappable `SUGGESTIONS` list (v2) — one plan per passenger mode (walk / bicycle / transit) plus stay put, with a `FASTEST` badge on the recommended plan. Selecting a plan redraws the route preview map (driver route + passenger path), refits the camera, and updates the detail card, `MEETING UP LOCATION` card, and the Share / Open in Maps actions.
 - Shared key config lives in `lib/src/amap_config.dart`.
+- Settings (`lib/src/app_settings.dart` + hamburger panel on the dashboard): display language (English / 简体中文 / 日本語, strings in `lib/src/l10n.dart`) and default map app (AMap / Apple Maps / Baidu / browser, deep links in `lib/src/map_launcher.dart`); persisted with `shared_preferences`.
 
 ## Run
 

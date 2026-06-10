@@ -409,3 +409,26 @@ Files modified:
 - `RepaintBoundary` around the schematic route preview painter so page scrolling doesn't re-rasterize it.
 
 Verification: `dart format` applied, `flutter analyze` clean, `flutter test` 8/8, `flutter build macos --debug` succeeds.
+
+### Implementation Update (2026-06-10, Language Switching, Default Map App, Settings Panel)
+
+Files created:
+
+- `app/flutter/lib/src/app_settings.dart`: `AppSettings` (`ChangeNotifier`) holding the display language (`en` / `zhHans` / `ja`) and the default map app (`amap` / `appleMaps` / `baiduMaps` / `browser`), persisted with `shared_preferences`; exposed app-wide through `AppSettingsScope` (`InheritedNotifier`). First launch follows the device language when supported. An `AppSettings.inMemory` constructor serves tests.
+- `app/flutter/lib/src/l10n.dart`: lightweight string table `S` — every UI string resolves through `_t(en, zh, ja)`; looked up via `S.of(context)` so dependent widgets rebuild on language change. Falls back to English when no scope is present (bare widget tests).
+- `app/flutter/lib/src/map_launcher.dart`: builds map deep links and launches them. Links are raw strings via `launchUrlString` (not `Uri`) because `Uri.parse` lowercases hosts while AMap documents case-sensitive segments (`androidamap://viewMap`); coordinates use fixed 6-decimal formatting. AMap (`iosamap://` / `androidamap://`), Apple Maps (`maps.apple.com` universal link, Apple platforms only), Baidu (`baidumap://...&coord_type=gcj02`), or browser. Unhandled schemes (app not installed) fall back to the AMap web marker page.
+
+Files modified:
+
+- `app/flutter/lib/main.dart`:
+  - `main()` is async: loads persisted settings before `runApp`; the app is wrapped in `AppSettingsScope`.
+  - New hamburger (three-line) button next to the top-right mode selector. Tapping it expands the corner cluster into a glass settings panel with two sections: **Language** (English / 简体中文 / 日本語) and **Default map app** (platform-filtered choices), each with check-marked options applied and persisted immediately.
+  - All dashboard strings localized; search error state refactored from a stored string to a kind enum so messages follow language switches.
+- `app/flutter/lib/src/result_page.dart`: fully localized (header, badges, loading/error, suggestion tiles, detail cards, share text); `Open in Maps` now launches the configured map application instead of always opening the browser. Share text keeps the web marker link so recipients don't need any specific app.
+- `app/flutter/lib/src/pickup_optimizer.dart`: reverse-geocode fallback name is now empty and substituted with a localized label at display time.
+- `app/flutter/ios/Runner/Info.plist`: added `LSApplicationQueriesSchemes` (`iosamap`, `baidumap`).
+- `app/flutter/android/app/src/main/AndroidManifest.xml`: added `<queries>` intents for the `androidamap`, `baidumap`, and `https` schemes (Android 11+ package visibility).
+- `app/flutter/pubspec.yaml`: added `shared_preferences`.
+- `app/flutter/test/widget_test.dart`: added localization tests (Chinese and Japanese result pages via `AppSettingsScope` + `AppSettings.inMemory`) and map-link unit tests (AMap scheme case preservation, Baidu GCJ-02 declaration, browser fallback URL).
+
+Verification: `flutter analyze` clean, `flutter test` 13/13, `flutter build macos --debug` succeeds (new pod resolved).

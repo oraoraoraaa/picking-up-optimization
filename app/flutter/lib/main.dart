@@ -10,26 +10,43 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 
 import 'src/amap_config.dart';
+import 'src/app_settings.dart';
+import 'src/l10n.dart';
+import 'src/map_launcher.dart';
 import 'src/pickup_optimizer.dart';
 import 'src/result_page.dart';
 
-void main() {
-  runApp(const PickupOptimizationApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final settings = await AppSettings.load();
+  runApp(PickupOptimizationApp(settings: settings));
 }
 
 class PickupOptimizationApp extends StatelessWidget {
-  const PickupOptimizationApp({super.key});
+  const PickupOptimizationApp({super.key, required this.settings});
+
+  final AppSettings settings;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Picking-Up Optimization',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF7FB1D6)),
-        scaffoldBackgroundColor: const Color(0xFF111827),
+    return AppSettingsScope(
+      settings: settings,
+      child: ListenableBuilder(
+        listenable: settings,
+        builder: (BuildContext context, Widget? child) {
+          return MaterialApp(
+            title: 'Picking-Up Optimization',
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xFF7FB1D6),
+              ),
+              scaffoldBackgroundColor: const Color(0xFF111827),
+            ),
+            debugShowCheckedModeBanner: false,
+            home: const DashboardPage(),
+          );
+        },
       ),
-      debugShowCheckedModeBanner: false,
-      home: const DashboardPage(),
     );
   }
 }
@@ -37,6 +54,8 @@ class PickupOptimizationApp extends StatelessWidget {
 enum UserMode { driver, passenger }
 
 enum _SearchField { pickup, start }
+
+enum _SearchErrorKind { missingKey, failed }
 
 class _PoiSuggestion {
   const _PoiSuggestion({
@@ -78,6 +97,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   UserMode _mode = UserMode.driver;
   bool _modeMenuExpanded = false;
+  bool _settingsExpanded = false;
   bool _trafficEnabled = true;
   AMapController? _mapController;
   bool _centeredOnUser = false;
@@ -89,7 +109,8 @@ class _DashboardPageState extends State<DashboardPage> {
   final FocusNode _startFocusNode = FocusNode();
   _SearchField? _activeSearchField;
   bool _isSearching = false;
-  String? _searchError;
+  // Stored as a kind (not a string) so the message follows language changes.
+  _SearchErrorKind? _searchError;
   List<_PoiSuggestion> _suggestions = const <_PoiSuggestion>[];
   _PoiSuggestion? _pickupSelection;
   _PoiSuggestion? _startSelection;
@@ -147,9 +168,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context);
     final prompt = _mode == UserMode.driver
-        ? "Where's your passenger?"
-        : "Where's your driver?";
+        ? s.promptDriver
+        : s.promptPassenger;
 
     if (_supportsAmap && !_amapInitialized) {
       AMapInitializer.init(context, apiKey: amapApiKeys);
@@ -196,7 +218,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Positioned(
                 top: safe.top + 10,
                 right: 16,
-                child: _buildModeSelector(),
+                child: _buildTopRightCluster(),
               ),
               if (mapActive && _locationReady)
                 Positioned(
@@ -212,6 +234,206 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Top-right corner: either the settings panel (when expanded) or a row of
+  /// the hamburger settings button + the mode selector.
+  Widget _buildTopRightCluster() {
+    return AnimatedSize(
+      duration: _uiAnimDuration,
+      curve: Curves.easeOutQuart,
+      alignment: Alignment.topRight,
+      child: AnimatedSwitcher(
+        duration: _uiAnimDuration,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
+          return Stack(
+            alignment: Alignment.topRight,
+            children: <Widget>[...previousChildren, ?currentChild],
+          );
+        },
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          final scale = Tween<double>(begin: 0.96, end: 1.0).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          );
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: scale,
+              alignment: Alignment.topRight,
+              child: child,
+            ),
+          );
+        },
+        child: _settingsExpanded
+            ? _buildSettingsPanel()
+            : KeyedSubtree(
+                key: const ValueKey<String>('top_right_collapsed'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSettingsButton(),
+                    const SizedBox(width: 8),
+                    _buildModeSelector(),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsButton() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _settingsExpanded = true;
+          _modeMenuExpanded = false;
+        });
+      },
+      child: _glassCard(
+        borderRadius: 20,
+        padding: const EdgeInsets.all(10),
+        child: const Icon(
+          Icons.menu_rounded,
+          color: Color(0xFFF4FAFF),
+          size: 22,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsPanel() {
+    final s = S.of(context);
+    final settings = AppSettingsScope.maybeOf(context);
+
+    return KeyedSubtree(
+      key: const ValueKey<String>('settings_panel'),
+      child: _glassCard(
+        width: 250,
+        borderRadius: 22,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    s.settings,
+                    style: const TextStyle(
+                      color: Color(0xFFF4FAFF),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => setState(() => _settingsExpanded = false),
+                  borderRadius: BorderRadius.circular(14),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFFF4FAFF),
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _settingsSectionLabel(s.languageLabel),
+            const SizedBox(height: 6),
+            for (final language in AppLanguage.values) ...[
+              _settingsOption(
+                label: s.languageName(language),
+                selected: settings?.language == language,
+                onTap: () => settings?.language = language,
+              ),
+              const SizedBox(height: 6),
+            ],
+            const SizedBox(height: 4),
+            _settingsSectionLabel(s.defaultMapApp),
+            const SizedBox(height: 6),
+            for (final app in availableMapApps()) ...[
+              _settingsOption(
+                label: s.mapAppName(app),
+                selected: settings?.mapApp == app,
+                onTap: () => settings?.mapApp = app,
+              ),
+              const SizedBox(height: 6),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _settingsSectionLabel(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: const Color(0xFF06243C).withValues(alpha: 0.72),
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.4,
+      ),
+    );
+  }
+
+  Widget _settingsOption({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: _uiAnimFastDuration,
+        curve: Curves.easeOutCubic,
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: const Color(
+            0xFF4D6F92,
+          ).withValues(alpha: selected ? 0.54 : 0.30),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: selected ? 0.30 : 0.10),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFFF4FAFF),
+                  fontSize: 14.5,
+                ),
+              ),
+            ),
+            AnimatedSwitcher(
+              duration: _uiAnimFastDuration,
+              child: selected
+                  ? const Icon(
+                      Icons.check,
+                      key: ValueKey<String>('settings_option_check'),
+                      color: Colors.white,
+                      size: 18,
+                    )
+                  : const SizedBox(
+                      key: ValueKey<String>('settings_option_blank'),
+                      width: 18,
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -273,7 +495,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final location = _latestUserLocation;
     final controller = _mapController;
     if (location == null || controller == null) {
-      _showHint('Still locating you — one moment.');
+      _showHint(S.of(context).stillLocatingShort);
       return;
     }
     controller.moveCamera(
@@ -343,20 +565,20 @@ class _DashboardPageState extends State<DashboardPage> {
                         key: const ValueKey<String>('location_loading_overlay'),
                         color: const Color(0xFF0A1A2B),
                         alignment: Alignment.center,
-                        child: const Column(
+                        child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            SizedBox(
+                            const SizedBox(
                               width: 26,
                               height: 26,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.8,
                               ),
                             ),
-                            SizedBox(height: 12),
+                            const SizedBox(height: 12),
                             Text(
-                              'Fetching current location...',
-                              style: TextStyle(
+                              S.of(context).fetchingLocation,
+                              style: const TextStyle(
                                 color: Color(0xFFE7F8FF),
                                 fontSize: 14,
                               ),
@@ -388,9 +610,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildAmapHintCard() {
-    final reason = !_supportsAmap
-        ? 'AMap is available on iOS and Android only.'
-        : 'Missing AMAP API key. Pass keys with --dart-define.';
+    final s = S.of(context);
+    final reason = !_supportsAmap ? s.amapPlatformHint : s.missingMapKeyHint;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -460,18 +681,18 @@ class _DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Mode Selection',
-              style: TextStyle(
+            Text(
+              S.of(context).modeSelection,
+              style: const TextStyle(
                 color: Color(0xFFF4FAFF),
                 fontSize: 17,
                 fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(height: 8),
-            _modeOption(UserMode.driver, "I'm the driver"),
+            _modeOption(UserMode.driver, S.of(context).imTheDriver),
             const SizedBox(height: 7),
-            _modeOption(UserMode.passenger, "I'm the passenger"),
+            _modeOption(UserMode.passenger, S.of(context).imThePassenger),
           ],
         ),
       ),
@@ -487,7 +708,9 @@ class _DashboardPageState extends State<DashboardPage> {
           borderRadius: 20,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Text(
-            _mode == UserMode.driver ? 'Driver Mode' : 'Passenger Mode',
+            _mode == UserMode.driver
+                ? S.of(context).driverMode
+                : S.of(context).passengerMode,
             style: const TextStyle(
               color: Color(0xFFF4FAFF),
               fontSize: 17,
@@ -566,9 +789,9 @@ class _DashboardPageState extends State<DashboardPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Pick up Optimization',
-              style: TextStyle(
+            Text(
+              S.of(context).panelTitle,
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w500,
                 color: Color(0xFF06243C),
@@ -603,19 +826,19 @@ class _DashboardPageState extends State<DashboardPage> {
             _searchBar(
               controller: _pickupController,
               focusNode: _pickupFocusNode,
-              hint: 'Search for a place or address',
+              hint: S.of(context).searchPlaceHint,
               field: _SearchField.pickup,
             ),
             const SizedBox(height: 7),
-            const Text(
-              'Starting from a different location?',
-              style: TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
+            Text(
+              S.of(context).altStartPrompt,
+              style: const TextStyle(fontSize: 20, color: Color(0xFF5C77BE)),
             ),
             const SizedBox(height: 8),
             _searchBar(
               controller: _startController,
               focusNode: _startFocusNode,
-              hint: 'Search your start point',
+              hint: S.of(context).searchStartHint,
               field: _SearchField.start,
             ),
             const SizedBox(height: 12),
@@ -635,9 +858,12 @@ class _DashboardPageState extends State<DashboardPage> {
                   side: BorderSide(color: Colors.white.withValues(alpha: 0.24)),
                   elevation: 0,
                 ),
-                child: const Text(
-                  'Start Route Optimizing',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+                child: Text(
+                  S.of(context).startOptimizing,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
@@ -653,22 +879,21 @@ class _DashboardPageState extends State<DashboardPage> {
   void _startOptimizing() {
     FocusScope.of(context).unfocus();
 
+    final s = S.of(context);
     final pickup = _pickupSelection;
     if (pickup == null) {
       _showHint(
-        _mode == UserMode.driver
-            ? "Select your passenger's location first."
-            : "Select your driver's location first.",
+        _mode == UserMode.driver ? s.selectPassengerFirst : s.selectDriverFirst,
       );
       return;
     }
 
     final ownStart = _startSelection?.latLng ?? _latestUserLocation;
     if (ownStart == null) {
-      _showHint('Still locating you — wait a moment or set a start point.');
+      _showHint(s.stillLocatingLong);
       return;
     }
-    final ownName = _startSelection?.name ?? 'My location';
+    final ownName = _startSelection?.name ?? s.myLocation;
 
     final request = _mode == UserMode.driver
         ? OptimizationRequest(
@@ -801,25 +1026,31 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildSuggestionPanel(_SearchField field, String query) {
+    final s = S.of(context);
     if (query.isEmpty) {
       return const SizedBox.shrink();
     }
 
     if (_searchError != null && !_isSearching) {
-      return _suggestionMessage(icon: Icons.info_outline, text: _searchError!);
+      return _suggestionMessage(
+        icon: Icons.info_outline,
+        text: _searchError == _SearchErrorKind.missingKey
+            ? s.missingWebKey
+            : s.searchFailed,
+      );
     }
 
     if (_isSearching && _suggestions.isEmpty) {
       return _suggestionMessage(
         icon: Icons.manage_search,
-        text: 'Searching nearby places...',
+        text: s.searchingNearby,
       );
     }
 
     if (!_isSearching && _suggestions.isEmpty) {
       return _suggestionMessage(
         icon: Icons.location_searching,
-        text: 'No matching places found.',
+        text: s.noMatchingPlaces,
       );
     }
 
@@ -985,8 +1216,7 @@ class _DashboardPageState extends State<DashboardPage> {
       if (!mounted) return;
       setState(() {
         _isSearching = false;
-        _searchError =
-            'Missing AMAP_WEB_KEY. Please configure a Web Service key.';
+        _searchError = _SearchErrorKind.missingKey;
         _suggestions = const <_PoiSuggestion>[];
       });
       return;
@@ -1010,8 +1240,7 @@ class _DashboardPageState extends State<DashboardPage> {
       setState(() {
         _isSearching = false;
         _suggestions = const <_PoiSuggestion>[];
-        _searchError =
-            'Search failed. Please check your network and key settings.';
+        _searchError = _SearchErrorKind.failed;
       });
     }
   }
@@ -1268,7 +1497,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            poi.name ?? 'Unknown Location',
+                            poi.name ?? S.of(context).unknownLocation,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1302,9 +1531,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 11),
                       ),
-                      child: const Text(
-                        'My passenger is here',
-                        style: TextStyle(
+                      child: Text(
+                        S.of(context).myPassengerIsHere,
+                        style: const TextStyle(
                           fontSize: 15.5,
                           fontWeight: FontWeight.w500,
                         ),
@@ -1329,9 +1558,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 11),
                       ),
-                      child: const Text(
-                        "I'll go from here",
-                        style: TextStyle(
+                      child: Text(
+                        S.of(context).illGoFromHere,
+                        style: const TextStyle(
                           fontSize: 15.5,
                           fontWeight: FontWeight.w500,
                         ),
@@ -1356,9 +1585,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 11),
                       ),
-                      child: const Text(
-                        'My driver is here',
-                        style: TextStyle(
+                      child: Text(
+                        S.of(context).myDriverIsHere,
+                        style: const TextStyle(
                           fontSize: 15.5,
                           fontWeight: FontWeight.w500,
                         ),
@@ -1383,9 +1612,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 11),
                       ),
-                      child: const Text(
-                        "I'm here",
-                        style: TextStyle(
+                      child: Text(
+                        S.of(context).imHere,
+                        style: const TextStyle(
                           fontSize: 15.5,
                           fontWeight: FontWeight.w500,
                         ),
@@ -1404,7 +1633,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void _setPickupFromPoi(AMapPoi poi, LatLng latLng) {
     final suggestion = _PoiSuggestion(
       id: poi.id ?? '${poi.name}_${latLng.latitude}_${latLng.longitude}',
-      name: poi.name ?? 'Unknown',
+      name: poi.name ?? S.of(context).unknownLocation,
       address: '',
       latLng: latLng,
       district: '',
@@ -1426,7 +1655,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void _setStartFromPoi(AMapPoi poi, LatLng latLng) {
     final suggestion = _PoiSuggestion(
       id: poi.id ?? '${poi.name}_${latLng.latitude}_${latLng.longitude}',
-      name: poi.name ?? 'Unknown',
+      name: poi.name ?? S.of(context).unknownLocation,
       address: '',
       latLng: latLng,
       district: '',

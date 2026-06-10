@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 
+import 'package:pickup_op_flutter/src/app_settings.dart';
+import 'package:pickup_op_flutter/src/map_launcher.dart';
 import 'package:pickup_op_flutter/src/pickup_optimizer.dart';
 import 'package:pickup_op_flutter/src/result_page.dart';
 
@@ -27,8 +29,9 @@ PickupSuggestion _modeSuggestion({
     meetingPointAddress: 'Huangpu District, Shanghai',
     driverEtaMin: driverEtaMin,
     passengerEtaMin: passengerEtaMin,
-    completionMin:
-        driverEtaMin > passengerEtaMin ? driverEtaMin : passengerEtaMin,
+    completionMin: driverEtaMin > passengerEtaMin
+        ? driverEtaMin
+        : passengerEtaMin,
     driverSavedMin: 14 - driverEtaMin,
     score: scoreOption(driverEtaMin, passengerEtaMin, mode),
     driverRoutePolyline: [_driver, meetingPoint],
@@ -213,13 +216,84 @@ void main() {
     });
   });
 
+  group('localization', () {
+    const request = OptimizationRequest(
+      driver: _driver,
+      driverName: 'Lujiazui',
+      passenger: _passenger,
+      passengerName: "People's Square",
+      apiKey: '',
+    );
+
+    Widget localizedApp(AppLanguage language) {
+      return AppSettingsScope(
+        settings: AppSettings.inMemory(language: language),
+        child: MaterialApp(
+          home: ResultPage(
+            request: request,
+            runOptimization: (_) async => _fakeResult(),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('renders Simplified Chinese when selected', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(localizedApp(AppLanguage.zhHans));
+      await tester.pumpAndSettle();
+
+      expect(find.text('优化结果'), findsOneWidget);
+      expect(find.text('推荐方案'), findsOneWidget);
+      expect(find.text('原地等待'), findsWidgets);
+      expect(find.text('分享'), findsOneWidget);
+      expect(find.text('在地图中打开'), findsOneWidget);
+    });
+
+    testWidgets('renders Japanese when selected', (WidgetTester tester) async {
+      await tester.pumpWidget(localizedApp(AppLanguage.ja));
+      await tester.pumpAndSettle();
+
+      expect(find.text('最適化結果'), findsOneWidget);
+      expect(find.text('候補プラン'), findsOneWidget);
+      expect(find.text('共有'), findsOneWidget);
+      expect(find.text('地図で開く'), findsOneWidget);
+    });
+  });
+
+  group('map launcher', () {
+    const point = LatLng(31.2381, 121.4849);
+
+    test('builds AMap scheme link preserving documented case', () {
+      // defaultTargetPlatform is android under flutter_test.
+      final url = mapAppMarkerUrl(MapAppChoice.amap, point, '外滩');
+      expect(url, startsWith('androidamap://viewMap?'));
+      expect(url, contains('lat=31.238100'));
+      expect(url, contains('lon=121.484900'));
+      expect(url, contains('poiname=${Uri.encodeComponent('外滩')}'));
+    });
+
+    test('builds Baidu link with GCJ-02 coordinate declaration', () {
+      final url = mapAppMarkerUrl(MapAppChoice.baiduMaps, point, 'The Bund');
+      expect(url, startsWith('baidumap://map/marker?'));
+      expect(url, contains('coord_type=gcj02'));
+      expect(url, contains('location=31.238100,121.484900'));
+    });
+
+    test('browser choice uses the AMap web marker page', () {
+      final url = mapAppMarkerUrl(MapAppChoice.browser, point, 'The Bund');
+      expect(url, startsWith('https://uri.amap.com/marker?'));
+      expect(url, contains('position=121.484900,31.238100'));
+    });
+  });
+
   group('engine port (mirrors core/src/engine.rs tests)', () {
     test('reachable modes are gated by distance', () {
       expect(reachableModes(500), [MobilityMode.walking, MobilityMode.bicycle]);
-      expect(
-        reachableModes(2500),
-        [MobilityMode.bicycle, MobilityMode.transit],
-      );
+      expect(reachableModes(2500), [
+        MobilityMode.bicycle,
+        MobilityMode.transit,
+      ]);
       expect(reachableModes(6000), [MobilityMode.transit]);
       expect(reachableModes(10000), isEmpty);
     });

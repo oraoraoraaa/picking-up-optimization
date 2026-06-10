@@ -5,10 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 
 import 'amap_config.dart';
+import 'app_settings.dart';
+import 'l10n.dart';
+import 'map_launcher.dart';
 import 'pickup_optimizer.dart';
 
 /// Result screen (v2): the design of `resource/images/design/result_v1.png`
@@ -115,6 +117,12 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
+  /// Localized display name with a fallback when reverse geocoding failed.
+  String _displayName(S s, PickupSuggestion suggestion) {
+    final name = suggestion.meetingPointName.trim();
+    return name.isEmpty ? s.fallbackMeetingName : name;
+  }
+
   Widget _buildHeader({String? badge}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
@@ -139,9 +147,9 @@ class _ResultPageState extends State<ResultPage> {
             ),
           ),
           const SizedBox(width: 12),
-          const Text(
-            'Optimization Result',
-            style: TextStyle(
+          Text(
+            S.of(context).optimizationResult,
+            style: const TextStyle(
               color: Color(0xFFE7F8FF),
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -170,6 +178,7 @@ class _ResultPageState extends State<ResultPage> {
   }
 
   Widget _buildLoading() {
+    final s = S.of(context);
     return Column(
       children: [
         _buildHeader(),
@@ -183,13 +192,13 @@ class _ResultPageState extends State<ResultPage> {
                 child: CircularProgressIndicator(strokeWidth: 3),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Optimizing your pickup...',
-                style: TextStyle(color: Color(0xFFE7F8FF), fontSize: 16),
+              Text(
+                s.optimizingTitle,
+                style: const TextStyle(color: Color(0xFFE7F8FF), fontSize: 16),
               ),
               const SizedBox(height: 6),
               Text(
-                'Checking traffic and meeting points along the route',
+                s.optimizingSubtitle,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.55),
                   fontSize: 13,
@@ -218,9 +227,9 @@ class _ResultPageState extends State<ResultPage> {
                   size: 38,
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Optimization failed',
-                  style: TextStyle(
+                Text(
+                  S.of(context).optimizationFailed,
+                  style: const TextStyle(
                     color: Color(0xFFE7F8FF),
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
@@ -236,7 +245,10 @@ class _ResultPageState extends State<ResultPage> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                FilledButton(onPressed: _retry, child: const Text('Try again')),
+                FilledButton(
+                  onPressed: _retry,
+                  child: Text(S.of(context).tryAgain),
+                ),
               ],
             ),
           ),
@@ -246,10 +258,11 @@ class _ResultPageState extends State<ResultPage> {
   }
 
   Widget _buildResult(OptimizationResult result) {
+    final s = S.of(context);
     final badge = switch (result.dataSource) {
-      'amap' => 'Live traffic',
-      'amap_with_fallback' => 'Live + estimates',
-      _ => 'Estimates only',
+      'amap' => s.badgeLiveTraffic,
+      'amap_with_fallback' => s.badgeLiveEstimates,
+      _ => s.badgeEstimatesOnly,
     };
     final index = _selectedIndex.clamp(0, result.suggestions.length - 1);
     final selected = result.suggestions[index];
@@ -317,18 +330,22 @@ class _ResultPageState extends State<ResultPage> {
   // --- Map card -------------------------------------------------------------
 
   Widget _buildMapCard(PickupSuggestion selected) {
+    final s = S.of(context);
     final height = math.max(MediaQuery.of(context).size.height * 0.32, 210.0);
 
     final driverChip = _mapChip(
-      label: 'Drive ${selected.driverEtaMin.ceil()} min',
+      label: s.chipDrive(selected.driverEtaMin.ceil()),
       background: Colors.white.withValues(alpha: 0.92),
       foreground: const Color(0xFF14324F),
     );
     final passengerChip = _mapChip(
       label: selected.stayPut
-          ? 'Passenger stays put'
-          : '${selected.mode!.verb} ${selected.passengerEtaMin.ceil()} min'
-                '${selected.recommended ? ' · Suggested' : ''}',
+          ? s.chipStaysPut
+          : s.chipPassengerGo(
+              selected.mode!,
+              selected.passengerEtaMin.ceil(),
+              suggested: selected.recommended,
+            ),
       background: const Color(0xE0337FD6),
       foreground: Colors.white,
     );
@@ -430,19 +447,25 @@ class _ResultPageState extends State<ResultPage> {
     final markers = <Marker>{
       Marker(
         position: request.driver,
-        infoWindow: InfoWindow(title: 'Driver: ${request.driverName}'),
+        infoWindow: InfoWindow(
+          title: S.of(context).markerDriver(request.driverName),
+        ),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
       ),
       Marker(
         position: request.passenger,
-        infoWindow: InfoWindow(title: 'Passenger: ${request.passengerName}'),
+        infoWindow: InfoWindow(
+          title: S.of(context).markerPassenger(request.passengerName),
+        ),
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
       ),
       if (!selected.stayPut)
         Marker(
           position: selected.meetingPoint,
           infoWindow: InfoWindow(
-            title: 'Meet here: ${selected.meetingPointName}',
+            title: S
+                .of(context)
+                .markerMeetHere(_displayName(S.of(context), selected)),
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(
             BitmapDescriptor.hueGreen,
@@ -514,7 +537,7 @@ class _ResultPageState extends State<ResultPage> {
         Padding(
           padding: const EdgeInsets.only(left: 6, bottom: 8),
           child: Text(
-            'SUGGESTIONS',
+            S.of(context).suggestionsLabel,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.65),
               fontSize: 12.5,
@@ -536,14 +559,14 @@ class _ResultPageState extends State<ResultPage> {
     int index,
     bool isSelected,
   ) {
+    final s = S.of(context);
     final suggestion = result.suggestions[index];
     final title = suggestion.stayPut
-        ? 'Stay put'
-        : '${suggestion.mode!.displayName} '
-              '${suggestion.passengerEtaMin.ceil()} min';
+        ? s.stayPutTile
+        : s.tileTitle(suggestion.mode!, suggestion.passengerEtaMin.ceil());
     final subtitle = suggestion.stayPut
-        ? 'Wait — the driver comes to you'
-        : 'Meet at ${suggestion.meetingPointName}';
+        ? s.stayPutSubtitle
+        : s.meetAt(_displayName(s, suggestion));
 
     return InkWell(
       onTap: () => _selectSuggestion(result, index),
@@ -609,9 +632,9 @@ class _ResultPageState extends State<ResultPage> {
                             color: _cardGreenBottom,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text(
-                            'FASTEST',
-                            style: TextStyle(
+                          child: Text(
+                            s.cardFastest,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 9.5,
                               fontWeight: FontWeight.w700,
@@ -640,7 +663,7 @@ class _ResultPageState extends State<ResultPage> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '${suggestion.completionMin.ceil()} min',
+                  s.minutesShort(suggestion.completionMin.ceil()),
                   style: const TextStyle(
                     color: Color(0xFFEFFFF8),
                     fontSize: 15.5,
@@ -650,8 +673,8 @@ class _ResultPageState extends State<ResultPage> {
                 const SizedBox(height: 2),
                 Text(
                   suggestion.stayPut
-                      ? 'baseline'
-                      : 'driver −${suggestion.driverSavedMin.round()} min',
+                      ? s.baselineTag
+                      : s.driverSavesTag(suggestion.driverSavedMin.round()),
                   style: TextStyle(
                     color: suggestion.stayPut
                         ? Colors.white.withValues(alpha: 0.55)
@@ -671,11 +694,12 @@ class _ResultPageState extends State<ResultPage> {
   // --- Detail card ------------------------------------------------------------
 
   Widget _buildDetailCard(PickupSuggestion selected) {
+    final s = S.of(context);
     final title = selected.recommended
-        ? 'FASTEST'
+        ? s.cardFastest
         : selected.stayPut
-        ? 'STAY PUT'
-        : 'ALTERNATIVE';
+        ? s.cardStayPut
+        : s.cardAlternative;
     final gradientColors = selected.recommended
         ? const [_cardGreenTop, _cardGreenBottom]
         : const [_cardSlateTop, _cardSlateBottom];
@@ -684,14 +708,18 @@ class _ResultPageState extends State<ResultPage> {
         : const Color(0xFFEAF3FF);
 
     final passengerLine = selected.stayPut
-        ? 'Passenger: Stay at the pickup point'
-        : 'Passenger: ${selected.mode!.verb} '
-              '${selected.passengerEtaMin.ceil()} mins '
-              'to ${selected.meetingPointName}';
+        ? s.passengerStayLine
+        : s.passengerGoLine(
+            selected.mode!,
+            selected.passengerEtaMin.ceil(),
+            _displayName(s, selected),
+          );
     final driverLine = selected.stayPut
-        ? 'Driver: Arrive in ${selected.driverEtaMin.ceil()} mins'
-              '${selected.recommended ? ' — the direct route is already fastest' : ''}'
-        : 'Driver: Save ${selected.driverSavedMin.round()} mins driving time';
+        ? s.driverArriveLine(
+            selected.driverEtaMin.ceil(),
+            directFastest: selected.recommended,
+          )
+        : s.driverSaveLine(selected.driverSavedMin.round());
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
@@ -770,9 +798,9 @@ class _ResultPageState extends State<ResultPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'MEETING UP LOCATION:',
-            style: TextStyle(
+          Text(
+            S.of(context).meetingUpLocation,
+            style: const TextStyle(
               color: Color(0xFF7C3A4C),
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -789,7 +817,7 @@ class _ResultPageState extends State<ResultPage> {
             child: Column(
               children: [
                 Text(
-                  selected.meetingPointName,
+                  _displayName(S.of(context), selected),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(0xFF3A2A35),
@@ -819,11 +847,12 @@ class _ResultPageState extends State<ResultPage> {
   // --- Actions --------------------------------------------------------------
 
   Widget _buildActions(PickupSuggestion selected) {
+    final s = S.of(context);
     return Row(
       children: [
         Expanded(
           child: _actionButton(
-            label: 'Share',
+            label: s.share,
             color: _sharePurple,
             onPressed: () => _shareSummary(selected),
           ),
@@ -831,7 +860,7 @@ class _ResultPageState extends State<ResultPage> {
         const SizedBox(width: 12),
         Expanded(
           child: _actionButton(
-            label: 'Open in Maps',
+            label: s.openInMaps,
             color: _openBlue,
             onPressed: () => _openInMaps(selected),
           ),
@@ -861,45 +890,48 @@ class _ResultPageState extends State<ResultPage> {
     );
   }
 
-  String _mapsUrl(PickupSuggestion selected) {
-    final point = selected.meetingPoint;
-    final name = Uri.encodeComponent(selected.meetingPointName);
-    return 'https://uri.amap.com/marker?position=${point.longitude},'
-        '${point.latitude}&name=$name&src=pickup-op';
-  }
-
   Future<void> _shareSummary(PickupSuggestion selected) async {
+    final s = S.of(context);
+    final name = _displayName(s, selected);
     final lines = <String>[
-      'Pickup plan — Picking-Up Optimization',
-      'Meet at: ${selected.meetingPointName}',
-      if (selected.meetingPointAddress != selected.meetingPointName)
-        'Address: ${selected.meetingPointAddress}',
+      s.shareTitle,
+      s.shareMeetAt(name),
+      if (selected.meetingPointAddress != name)
+        s.shareAddress(selected.meetingPointAddress),
       if (!selected.stayPut && selected.mode != null)
-        'Passenger: ${selected.mode!.verb.toLowerCase()} '
-            '~${selected.passengerEtaMin.ceil()} min',
-      'Driver: arrives in ~${selected.driverEtaMin.ceil()} min'
-          '${selected.stayPut ? '' : ', saves ~${selected.driverSavedMin.round()} min'}',
-      _mapsUrl(selected),
+        s.sharePassenger(selected.mode!, selected.passengerEtaMin.ceil()),
+      s.shareDriver(
+        selected.driverEtaMin.ceil(),
+        savedMins: selected.stayPut ? null : selected.driverSavedMin.round(),
+      ),
+      // The web link works for any recipient regardless of installed apps.
+      webMarkerUrl(selected.meetingPoint, name),
     ];
     await Clipboard.setData(ClipboardData(text: lines.join('\n')));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Pickup plan copied — paste it anywhere to share'),
+      SnackBar(
+        content: Text(s.planCopied),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
+  /// Open the meeting point in the user's preferred map application
+  /// (Settings > Default map app), falling back to the web marker page.
   Future<void> _openInMaps(PickupSuggestion selected) async {
-    final ok = await launchUrl(
-      Uri.parse(_mapsUrl(selected)),
-      mode: LaunchMode.externalApplication,
+    final s = S.of(context);
+    final mapApp =
+        AppSettingsScope.maybeOf(context)?.mapApp ?? MapAppChoice.amap;
+    final ok = await openInMapApp(
+      mapApp,
+      selected.meetingPoint,
+      _displayName(s, selected),
     );
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open the map application'),
+        SnackBar(
+          content: Text(s.cannotOpenMapApp),
           behavior: SnackBarBehavior.floating,
         ),
       );
