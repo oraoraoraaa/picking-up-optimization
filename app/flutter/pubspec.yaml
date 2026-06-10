@@ -34,6 +34,7 @@ dependencies:
   x_amap_base: ^1.0.3
   permission_handler: ^12.0.1
   http: ^1.5.0
+  url_launcher: ^6.3.1
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

@@ -2,26 +2,45 @@
 
 The core RUST implementation like domain, optimization engine, scoring, route fusion, caching policy, etc. should be put in this directory.
 
-## Vertical Slice Entry Point
+## Structure
 
-The first vertical slice prototype lives in `src/main.rs`.
+| File | Responsibility |
+| --- | --- |
+| `src/domain.rs` | Shared DTOs (`GeoPoint`, `MobilityMode`, `RecommendationSet`, `Scenario`, ...) |
+| `src/engine.rs` | Route-interception algorithm v1: candidate generation, weighted scoring, ranking, stay-put decision. Pure and unit-tested. |
+| `src/amap.rs` | Blocking AMap Web Service clients (driving/walking/bicycling/transit) + deterministic fallbacks |
+| `src/lib.rs` | `run_analysis` orchestrator tying route fetch → candidates → evaluation → recommendation |
+| `src/main.rs` | Thin CLI entry point |
 
-It currently does the following:
+## The Algorithm (v1)
 
-- Uses hardcoded passenger/driver + pickup candidate locations
-- Fetches route durations from Amap for driving/walking/bicycle/transit when `AMAP_KEY` is available
-- Applies simple scoring (`driver_eta + passenger_eta`)
-- Ranks and returns the top 3 recommendations as JSON
-- Falls back to deterministic ETA estimates when API calls are unavailable
+Meeting points are sampled along the driver's inbound route within the passenger's reach (walk/bicycle/transit gated by distance), then each candidate-mode pair is scored with:
 
-Run it with:
+```text
+score = max(driver_eta, passenger_eta) + 0.15 * passenger_eta + mode_penalty
+```
+
+The best option must beat the stay-put baseline by at least 1.5 minutes, otherwise the engine recommends keeping the original pickup point. See `docs/IMPLEMENTATION.md` for the full description.
+
+> The Flutter app currently runs a documented Dart mirror of this engine on-device (`app/flutter/lib/src/pickup_optimizer.dart`) until the FFI bridge lands. Keep weights and rules in sync when tuning.
+
+## Run It
 
 ```bash
 cd core
-cargo run --quiet
+cargo test         # engine unit tests
+cargo run --quiet  # built-in Shanghai demo scenario, JSON to stdout
 ```
 
-Optional key setup:
+Custom scenario from a file or stdin:
+
+```bash
+cargo run --quiet -- scenario.json
+echo '{"driver":{"lon":121.5086,"lat":31.2454},"passenger":{"lon":121.4737,"lat":31.2304},"city":"上海"}' \
+  | cargo run --quiet -- -
+```
+
+Optional key setup (otherwise deterministic fallback estimates are used):
 
 ```bash
 export AMAP_KEY="your_amap_web_service_key"

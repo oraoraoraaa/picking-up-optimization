@@ -260,3 +260,76 @@ Notes:
 
 - Existing interaction logic (mode changes, search behavior, marker updates, POI bottom sheet actions) remains unchanged.
 - This update is purely UX motion polish, designed to improve perceived responsiveness without changing business behavior.
+
+## Rust Core Optimization Engine
+
+### Implementation Update (2026-06-10, Route-Interception Engine v1)
+
+Replaced the hardcoded vertical-slice binary in `core/` with a structured library + CLI implementing the first real optimization algorithm.
+
+Files modified/created:
+
+- `core/src/domain.rs` (new): shared DTOs — `GeoPoint`, `NamedPoint`, `MobilityMode`, `RoutePoint`, `Candidate`, `EvaluatedOption`, `Recommendation`, `RecommendationSet`, `Scenario`.
+- `core/src/engine.rs` (new): the pure algorithm (no I/O, fully unit-tested).
+- `core/src/amap.rs` (new): blocking AMap Web Service clients + deterministic fallbacks.
+- `core/src/lib.rs` (new): `run_analysis` orchestrator.
+- `core/src/main.rs` (rewritten): thin CLI around the library.
+
+The algorithm (route interception):
+
+1. Fetch the driver's driving route to the passenger (AMap `direction/driving`, `extensions=all`), building per-vertex cumulative travel time by distributing each step's duration proportionally over its polyline segment lengths.
+2. Generate meeting-point candidates on that route: vertices within the passenger's reach (walk ≤ 1.2 km, bicycle ≤ 3.5 km, transit 2–8 km straight-line), requiring a non-trivial passenger move (≥ 120 m) and a minimum driver saving (≥ 60 s). Candidates are spaced ≥ 250 m apart and evenly downsampled to at most 4 to bound API fan-out.
+3. Evaluate each candidate × reachable mode with passenger ETAs from AMap walking/bicycling/transit APIs (deterministic speed-based fallbacks when unavailable).
+4. Score with a weighted objective:
+   `score = max(driver_eta, passenger_eta) + 0.15 * passenger_eta + mode_penalty` (bicycle +1.0 min, transit +2.5 min).
+5. Rank ascending with tie-breakers (lower passenger effort, then lower driver ETA) and recommend the winner only if it beats the stay-put baseline by ≥ 1.5 min; otherwise recommend staying put.
+
+Output (`RecommendationSet` JSON) includes the best recommendation, up to 2 alternatives, the driver route polyline truncated at the meeting point, and the passenger path polyline (walking path from AMap when applicable) so the UI can render both routes.
+
+CLI usage:
+
+```bash
+cd core
+cargo run --quiet                  # built-in Shanghai demo scenario
+cargo run --quiet -- scenario.json # scenario from file
+echo '{"driver":{"lon":121.5086,"lat":31.2454},"passenger":{"lon":121.4737,"lat":31.2304},"city":"上海"}' | cargo run --quiet -- -
+```
+
+`AMAP_KEY` enables live routing; without it the run degrades to deterministic estimates (`data_source: "fallback"`).
+
+Testing: `cargo test` covers candidate generation (reach/spacing/cap/driver-saving invariants), mode gating, scoring monotonicity, ranking tie-breakers, and the stay-put decision rule (10 tests).
+
+Note on app integration: the Rust core is the reference engine. The Flutter app currently runs an on-device Dart mirror of the same engine (see next section) because the `flutter_rust_bridge` FFI bridge is not wired yet; wiring it is the next planned step, and the shared formulas/constants are documented on both sides to stay in sync.
+
+## Result UI and Optimization Flow
+
+### Implementation Update (2026-06-10, Result Page per result_v1.png)
+
+Implemented the result screen design (`resource/images/design/result_v1.png`) and wired the dashboard's `Start Route Optimizing` button to a full on-device optimization flow.
+
+Files modified/created:
+
+- `app/flutter/lib/src/amap_config.dart` (new): shared build-time key configuration (extracted from `main.dart`).
+- `app/flutter/lib/src/pickup_optimizer.dart` (new): on-device optimization service — a documented Dart port of `core/src/engine.rs` (same candidate generation, weights, and decision rule) calling AMap driving/walking/bicycling/transit/regeo Web Service APIs, with the same deterministic fallbacks.
+- `app/flutter/lib/src/result_page.dart` (new): the result screen.
+- `app/flutter/lib/main.dart`: wired `_startOptimizing` to the CTA button; key config now delegates to `amap_config.dart`.
+- `app/flutter/pubspec.yaml`: added `url_launcher`.
+- `app/flutter/macos/Runner/Release.entitlements`: added `com.apple.security.network.client` so sandboxed release builds can call AMap.
+- `app/flutter/test/widget_test.dart`: replaced the stale vertical-slice test with result-page widget tests and engine-port unit tests.
+
+Flow:
+
+- Driver mode: pickup field = passenger location, start field (or live GPS) = driver start.
+- Passenger mode: pickup field = driver location, start field (or live GPS) = passenger start.
+- Missing inputs surface as floating snackbar hints; otherwise the app pushes `ResultPage`, which runs `PickupOptimizer.optimize` with loading/error/retry states.
+
+Result page contents (per design):
+
+- Route preview map card: on iOS/Android with keys, a live `AMapWidget` with traffic, the driver route polyline (blue), the passenger path polyline (dashed green), markers for driver/passenger/meeting point, and camera fitted to the route bounds; elsewhere, a `CustomPainter` schematic that projects the real polylines into the card. Floating chips show `Drive X min` and `<Mode> Y min · Suggested`.
+- Green `FASTEST` card: passenger instruction (`Walk 5 mins to <place>`) and driver benefit (`Save 7 mins driving time`), with stay-put variants.
+- Pink `MEETING UP LOCATION:` card: meeting point name + address resolved via AMap reverse geocoding (nearby POI preferred, formatted address fallback, coordinates as last resort).
+- `Share` button: copies a plan summary + AMap link to the clipboard.
+- `Open in Maps` button: opens `https://uri.amap.com/marker?...` via `url_launcher` (AMap app or browser).
+- Header shows a data-source badge: `Live traffic` / `Live + estimates` / `Estimates only`.
+
+Verification: `flutter analyze` clean, `flutter test` 6/6 passing, `flutter build macos --debug` succeeds, `cargo test` 10/10 passing.

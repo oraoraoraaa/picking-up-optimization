@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:amap_map/amap_map.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:x_amap_base/x_amap_base.dart';
+
+import 'src/amap_config.dart';
+import 'src/pickup_optimizer.dart';
+import 'src/result_page.dart';
 
 void main() {
   runApp(const PickupOptimizationApp());
@@ -69,20 +72,6 @@ class _DashboardPageState extends State<DashboardPage> {
     target: LatLng(39.909187, 116.397451),
     zoom: 11.5,
   );
-  static const AMapApiKey _amapApiKeys = AMapApiKey(
-    androidKey: String.fromEnvironment('AMAP_ANDROID_KEY', defaultValue: ''),
-    iosKey: String.fromEnvironment('AMAP_IOS_KEY', defaultValue: ''),
-  );
-  static const AMapPrivacyStatement _privacyStatement = AMapPrivacyStatement(
-    hasContains: true,
-    hasShow: true,
-    hasAgree: true,
-  );
-  static const String _amapWebKey = String.fromEnvironment(
-    'AMAP_WEB_KEY',
-    defaultValue: '',
-  );
-
   UserMode _mode = UserMode.driver;
   bool _modeMenuExpanded = false;
   AMapController? _mapController;
@@ -103,32 +92,13 @@ class _DashboardPageState extends State<DashboardPage> {
   Timer? _searchDebounce;
   Set<Marker> _selectedMarkers = <Marker>{};
 
-  bool get _supportsAmap {
-    if (kIsWeb) return false;
-    return defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS;
-  }
+  // Key/platform configuration is shared with the result page via
+  // src/amap_config.dart.
+  bool get _supportsAmap => supportsAmapPlatform;
 
-  bool get _hasConfiguredApiKey {
-    final android = (_amapApiKeys.androidKey ?? '').trim();
-    final ios = (_amapApiKeys.iosKey ?? '').trim();
-    return android.isNotEmpty || ios.isNotEmpty;
-  }
+  bool get _hasConfiguredApiKey => hasConfiguredMapKey;
 
-  String get _effectiveSearchKey {
-    final web = _amapWebKey.trim();
-    if (web.isNotEmpty) return web;
-
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return (_amapApiKeys.androidKey ?? '').trim();
-    }
-
-    if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return (_amapApiKeys.iosKey ?? '').trim();
-    }
-
-    return '';
-  }
+  String get _effectiveSearchKey => effectiveAmapWebKey;
 
   @override
   void initState() {
@@ -177,8 +147,8 @@ class _DashboardPageState extends State<DashboardPage> {
         : "Where's your driver?";
 
     if (_supportsAmap) {
-      AMapInitializer.init(context, apiKey: _amapApiKeys);
-      AMapInitializer.updatePrivacyAgree(_privacyStatement);
+      AMapInitializer.init(context, apiKey: amapApiKeys);
+      AMapInitializer.updatePrivacyAgree(amapPrivacyStatement);
     }
 
     return Scaffold(
@@ -523,7 +493,7 @@ class _DashboardPageState extends State<DashboardPage> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () {},
+              onPressed: _startOptimizing,
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(
                   0xFF5FC99E,
@@ -544,6 +514,56 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Build the optimization request from the current selections and open the
+  /// result page. The "pickup" field always holds the other party's location;
+  /// the "start" field (or live GPS) holds the user's own position.
+  void _startOptimizing() {
+    FocusScope.of(context).unfocus();
+
+    final pickup = _pickupSelection;
+    if (pickup == null) {
+      _showHint(
+        _mode == UserMode.driver
+            ? "Select your passenger's location first."
+            : "Select your driver's location first.",
+      );
+      return;
+    }
+
+    final ownStart = _startSelection?.latLng ?? _latestUserLocation;
+    if (ownStart == null) {
+      _showHint('Still locating you — wait a moment or set a start point.');
+      return;
+    }
+    final ownName = _startSelection?.name ?? 'My location';
+
+    final request = _mode == UserMode.driver
+        ? OptimizationRequest(
+            driver: ownStart,
+            driverName: ownName,
+            passenger: pickup.latLng,
+            passengerName: pickup.name,
+            apiKey: _effectiveSearchKey,
+          )
+        : OptimizationRequest(
+            driver: pickup.latLng,
+            driverName: pickup.name,
+            passenger: ownStart,
+            passengerName: ownName,
+            apiKey: _effectiveSearchKey,
+          );
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => ResultPage(request: request)),
+    );
+  }
+
+  void _showHint(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 

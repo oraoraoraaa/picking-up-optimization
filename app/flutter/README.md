@@ -1,20 +1,34 @@
 # The Flutter App
 
-Desktop UI for the V1 vertical slice.
+Mobile-first UI for the pickup optimization demo (iOS / Android with AMap; other platforms fall back to schematic previews).
 
 Whenever you modify the files in this folder, please update the description below.
 
 ## What This App Does
 
-- Launches the Rust analyzer in `../../core` using `cargo run --quiet`
-- Reads JSON recommendations from stdout
-- Displays top 3 pickup options with mode and ETA breakdown
+- Dashboard (`lib/main.dart`): full-screen AMap with live location, driver/passenger mode selector, POI search (input tips + keyword fallback), map POI tap selection.
+- Optimization service (`lib/src/pickup_optimizer.dart`): on-device port of the Rust core engine (`core/src/engine.rs`) — fetches the driver route and candidate ETAs from AMap Web Services, scores and ranks meeting points, and decides versus staying put. Keep its constants in sync with the Rust `EngineConfig`.
+- Result page (`lib/src/result_page.dart`): implements `resource/images/design/result_v1.png` — route preview map (driver route + passenger path), `FASTEST` summary card, `MEETING UP LOCATION` card, Share (clipboard) and Open in Maps (AMap URI) actions.
+- Shared key config lives in `lib/src/amap_config.dart`.
 
 ## Run
 
 ```bash
 cd app/flutter
-flutter run -d linux
+export AMAP_ANDROID_KEY="<your_android_key>"
+export AMAP_IOS_KEY="<your_ios_key>"
+export AMAP_WEB_KEY="<your_web_service_key>"
+flutter run \
+  --dart-define=AMAP_ANDROID_KEY=$AMAP_ANDROID_KEY \
+  --dart-define=AMAP_IOS_KEY=$AMAP_IOS_KEY \
+  --dart-define=AMAP_WEB_KEY=$AMAP_WEB_KEY
 ```
 
-If `AMAP_KEY` is available in the shell environment, the Rust analyzer will call Amap APIs. Otherwise, the analyzer returns fallback ETA estimates.
+Without keys the app still runs: the map becomes a placeholder, and the optimizer returns deterministic fallback estimates.
+
+## Test
+
+```bash
+flutter test     # result page widget tests + engine-port unit tests
+flutter analyze
+```

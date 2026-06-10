@@ -34,28 +34,36 @@ This project contains detailed and clear documentations. Reading them using web-
 
 ## Notice
 
-### V1 Vertical Slice Prototype
+### V1 Demo
 
-This repository now contains a working vertical slice prototype:
+This repository contains a working end-to-end demo:
 
-- Hardcoded passenger and driver locations
-- Rust scoring across baseline + alternatives and walking/bicycle/transit modes
-- Amap route/traffic fetching when `AMAP_KEY` is provided
-- Top 3 ranked options displayed in the Flutter desktop app
+- Dashboard with live AMap, driver/passenger modes, and POI search ([design](resource/images/design/dashboard_v1.png))
+- Route-interception optimization: meeting points are generated along the driver's inbound route, evaluated across walking/bicycle/transit, scored, and compared against staying put
+- Result screen with route preview, `FASTEST` summary, meeting-up location, Share, and Open in Maps ([design](resource/images/design/result_v1.png))
+- The algorithm's reference implementation lives in the Rust core (`core/`, unit-tested, runnable as a CLI); the app runs a documented on-device Dart mirror of it until the FFI bridge lands
 
-#### Run It
-
-1. Optional but recommended: set your Amap key.
-
-```bash
-export AMAP_KEY="your_amap_web_service_key"
-```
-
-2. Run the Flutter desktop app.
+#### Run the App (iOS / Android)
 
 ```bash
 cd app/flutter
-flutter run -d linux
+export AMAP_ANDROID_KEY="<your_android_key>"
+export AMAP_IOS_KEY="<your_ios_key>"
+export AMAP_WEB_KEY="<your_web_service_key>"
+flutter run \
+  --dart-define=AMAP_ANDROID_KEY=$AMAP_ANDROID_KEY \
+  --dart-define=AMAP_IOS_KEY=$AMAP_IOS_KEY \
+  --dart-define=AMAP_WEB_KEY=$AMAP_WEB_KEY
 ```
 
-The app triggers the Rust analyzer (`core`) via `cargo run --quiet` and renders top options. If Amap calls fail or no key is set, the prototype falls back to deterministic ETA estimation so the slice remains runnable.
+Without keys the app still runs with placeholder map layers and deterministic ETA estimates.
+
+#### Run the Rust Core CLI
+
+```bash
+cd core
+export AMAP_KEY="your_amap_web_service_key"  # optional
+cargo run --quiet
+```
+
+See [`core/README.md`](core/README.md) and [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) for details.
