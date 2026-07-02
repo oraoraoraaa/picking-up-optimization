@@ -1,49 +1,30 @@
-# Picking-Up Optimization
+# Picking-Up Optimization 接驾优化
 
-A tool for optimizing the process of a driver picking up a passenger.
+一个用于优化司机接载乘客流程的工具。
 
-![screenshot_dashboard_v1](resource/images/screenshot/dashboard_v1.png)
+![screenshot_dashboard_v1](resource/images/screenshot/dashboard_v2.png)
 
-## Problem
+## 问题
 
-When a driver is on the way to pick someone up, the initially selected pickup point is not always the fastest option. Traffic conditions can change at any time across the route, and simply sticking to one fixed point can waste time for both parties.
+当司机前往接载乘客时，最初选定的上车点未必总是最快的选择。沿途交通状况随时可能发生变化，若一味坚持在固定地点接人，可能会浪费双方的时间。
 
-## Solution
+## 解决方案
 
-This software continuously analyzes real-time traffic conditions and re-calculates the fastest pickup strategy in all circumstances. It evaluates whether to keep the original pickup point or switch to a better alternative, while considering both driver travel time and passenger transfer time. The passenger can reach recommended points by walking, bicycle, or public transit. By dynamically selecting the best meeting point and route, overall pickup time is reduced for both the driver and the passenger.
+该软件持续分析实时交通状况，并针对各种情况重新计算最优接载策略。它会综合考量司机行驶时间和乘客前往接载点所需的时间，从而评估是维持原定接载点，还是改用更优的替代方案。乘客可通过步行、骑行或乘坐公共交通工具前往推荐的接载点。通过动态选择最佳会合点与路线，系统缩短了司机和乘客各自的整体接载耗时。
 
-## Features
+## 功能特性
 
-- Continuous fastest-route recalculation for pickup under all traffic conditions
-- Alternative pickup point suggestions with passenger mode options: walking, bicycle, and transit
-- Joint route estimation for both driver and passenger, with ETA tradeoff comparison
+- 在各种交通状况下，持续重新计算前往上车点的最快路线
+- 推荐备选上车点，并提供多种出行模式选项：步行、骑行及公共交通
+- 综合估算司机与乘客的路线，并对比不同方案下的预计到达时间（ETA）
 
 ## API
 
-This project uses the [Amap (高德地图) API](https://lbs.amap.com/) for map data, real-time traffic information, and route planning.
+本项目使用 [Amap（高德地图）API](https://lbs.amap.com/) 获取地图数据、实时路况信息及进行路线规划。
 
----
+## 使用说明（需在 iOS / Android 物理机或模拟器运行）
 
-> Contents below this line is for developers only.
-
-![miku_for_developers](https://github.com/user-attachments/assets/4dbef352-5442-484e-bdbd-c2eea49d2114)
-
-Move to the [contribution guideline](docs/GUIDELINE.md) to check contribution guideline.
-
-This project contains detailed and clear documentations. Reading them using web-ui is recommended as it might not be a pleasant experience to read the tables in raw `.md` files.
-
-## Notice
-
-### V1 Demo
-
-This repository contains a working end-to-end demo:
-
-- Dashboard with live AMap, driver/passenger modes, and POI search ([design](resource/images/design/dashboard_v1.png))
-- Route-interception optimization: meeting points are generated along the driver's inbound route, evaluated across walking/bicycle/transit, scored, and compared against staying put
-- Result screen with route preview, a per-mode suggestion list (walk / bicycle / transit / stay put, v2), `FASTEST` summary, meeting-up location, Share, and Open in Maps ([design](resource/images/design/result_v1.png))
-- The algorithm's reference implementation lives in the Rust core (`core/`, unit-tested, runnable as a CLI); the app runs a documented on-device Dart mirror of it until the FFI bridge lands
-
-#### Run the App (iOS / Android)
+进入 `app/flutter` 文件夹，传入高德地图的 API 密钥并编译运行：
 
 ```bash
 cd app/flutter
@@ -56,14 +37,4 @@ flutter run \
   --dart-define=AMAP_WEB_KEY=$AMAP_WEB_KEY
 ```
 
-Without keys the app still runs with placeholder map layers and deterministic ETA estimates.
-
-#### Run the Rust Core CLI
-
-```bash
-cd core
-export AMAP_KEY="your_amap_web_service_key"  # optional
-cargo run --quiet
-```
-
-See [`core/README.md`](core/README.md) and [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) for details.
+在终端上允许相关权限后即可进行测试。
