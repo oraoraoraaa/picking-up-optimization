@@ -50,7 +50,7 @@ curl -s -X POST http://127.0.0.1:8080/analyze \
 
 ```bash
 # build context is the repo root because this crate depends on ../core
-docker build -f server/Dockerfile -t pickup-op-server .
+docker build -t pickup-op-server .
 docker run --rm -p 8080:8080 \
   -e AMAP_KEY=your_web_service_key \
   -e APP_TOKEN=change_me \

@@ -52,7 +52,7 @@ Container path:
 
 ```bash
 # Build from the repo ROOT (the crate depends on ../core):
-docker build -f server/Dockerfile -t pickup-op-server .
+docker build -t pickup-op-server .
 
 docker run --rm -p 8080:8080 \
   -e AMAP_KEY=your_web_service_key \

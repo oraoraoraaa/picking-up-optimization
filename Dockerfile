@@ -1,10 +1,10 @@
 # Multi-stage build for the pickup-op backend.
-# Build context must be the repository root (server depends on ../core):
-#   docker build -f server/Dockerfile -t pickup-op-server .
+# Build context must be the repository root so the workspace and path dependency on core resolve.
+#   docker build -t pickup-op-server .
 
 FROM rust:1-bookworm AS builder
 WORKDIR /build
-# Copy the workspace so the path dependency on ../core resolves.
+# Copy the workspace so the path dependency on core resolves.
 COPY Cargo.toml Cargo.lock ./
 COPY core ./core
 COPY server ./server

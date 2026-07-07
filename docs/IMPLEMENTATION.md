@@ -195,11 +195,13 @@ Files modified:
 Completed items:
 
 **Keyboard Dismissal:**
+
 - Wrapped the main dashboard `Stack` in a `GestureDetector` with `onTap` handler.
 - Calls `FocusScope.of(context).unfocus()` to dismiss keyboard when user taps outside search inputs.
 - Result: Keyboard closes automatically when clicking on map or other UI elements.
 
 **Interactive Map POI Selection:**
+
 - Enabled POI tap detection on `AMapWidget`:
   - Set `touchPoiEnabled: true` to allow POI tapping.
   - Registered `onPoiTouched` callback to capture tapped locations.
@@ -470,7 +472,7 @@ for the API.
   (`CACHE_TTL_SECS`, default 60; `X-Cache: HIT|MISS`), permissive CORS, request
   tracing, and graceful shutdown. Config via env: `AMAP_KEY`, `APP_TOKEN`,
   `PORT`, `BIND_ADDR`, `CACHE_TTL_SECS`.
-- `server/Dockerfile` (multi-stage, build context = repo root), `server/.env.example`,
+- `Dockerfile` (multi-stage, build context = repo root), `server/.env.example`,
   `server/README.md`.
 
 **Flutter — backend mode with on-device fallback:**
