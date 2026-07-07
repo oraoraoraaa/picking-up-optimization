@@ -118,23 +118,38 @@ cd app/flutter
 
 flutter build ipa --release \
   --dart-define=AMAP_IOS_KEY=$AMAP_IOS_KEY \
-  --dart-define=PICKUP_API_BASE=https://api.yourdomain.com \
+  --dart-define=PICKUP_API_BASE=$PICKUP_API_BASE \
   --dart-define=PICKUP_API_TOKEN=$PICKUP_API_TOKEN
 ```
 
+> If you do not have a paid Apple Developer account, and you want to sign it to your physical iPhone, use the command below instead.
+>
+> ```bash
+> cd app/flutter
+>
+> flutter build ios --release \
+>   --dart-define=AMAP_IOS_KEY=$AMAP_IOS_KEY \
+>   --dart-define=PICKUP_API_BASE=$PICKUP_API_BASE \
+>   --dart-define=PICKUP_API_TOKEN=$PICKUP_API_TOKEN
+> ```
+>
+> And then open the project in Xcode, set the Team and a unique Bundle Identifier, enable automatic signing (as instructed below), and then click the "play" button to build it directly to your iPhone connected via a physical cable.
+>
+> Alternatively, if what you want is just a short test on a physical iPhone, use the following commands while the phone is connected with cable:
+>
+> ```bash
+> flutter run \
+>   --dart-define=AMAP_IOS_KEY=$AMAP_IOS_KEY \
+>   --dart-define=PICKUP_API_BASE=$PICKUP_API_BASE \
+>   --dart-define=PICKUP_API_TOKEN=$PICKUP_API_TOKEN
+> ```
+
 Then distribute the `.ipa` (in `build/ios/ipa/`) via TestFlight / the App Store:
 
-- Open `ios/Runner.xcworkspace` in Xcode, set the Team and a unique Bundle
-  Identifier, and enable automatic signing; **or** use `flutter build ipa
-  --export-options-plist` with your provisioning profile.
-- Upload with Xcode Organizer or `xcrun altool`/`Transporter` to App Store
-  Connect, then release to TestFlight for device testing.
+- Open `ios/Runner.xcworkspace` in Xcode, set the Team and a unique Bundle Identifier, and enable automatic signing; **or** use `flutter build ipa --export-options-plist` with your provisioning profile.
+- Upload with Xcode Organizer or `xcrun altool`/`Transporter` to App Store Connect, then release to TestFlight for device testing.
 
-The app already declares the location usage strings and
-`LSApplicationQueriesSchemes` (`iosamap`, `baidumap`) in
-[`ios/Runner/Info.plist`](../app/flutter/ios/Runner/Info.plist). Since the app
-now calls **your** HTTPS backend rather than AMap directly, no additional ATS
-exception is required for optimization traffic.
+The app already declares the location usage strings and `LSApplicationQueriesSchemes` (`iosamap`, `baidumap`) in [`ios/Runner/Info.plist`](../app/flutter/ios/Runner/Info.plist). Since the app now calls **your** HTTPS backend rather than AMap directly, no additional ATS exception is required for optimization traffic.
 
 ### 2.3 Android
 

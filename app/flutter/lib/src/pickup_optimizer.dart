@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:x_amap_base/x_amap_base.dart';
 
 import 'amap_config.dart';
+import 'debug_log.dart';
 
 /// On-device port of the Rust core engine (`core/src/engine.rs`).
 ///
@@ -314,14 +316,29 @@ class PickupOptimizer {
   /// Runs optimization through the backend when one is configured, falling
   /// back to the on-device engine if the backend is unreachable or errors.
   Future<OptimizationResult> optimize(OptimizationRequest request) async {
+    AppDebugLog.log(
+      'Optimization pipeline started. backend=${_backendBaseUrl.isNotEmpty ? _backendBaseUrl : 'not configured'}; API key=${request.apiKey.trim().isNotEmpty ? 'present' : 'missing'}.',
+    );
     if (_backendBaseUrl.isNotEmpty) {
       try {
         final result = await _optimizeViaBackend(request);
-        if (result != null) return result;
-      } catch (_) {
-        // Fall through to the on-device engine on any backend failure.
+        if (result != null) {
+          AppDebugLog.log(
+            'Backend optimization completed successfully; rendering server response.',
+          );
+          return result;
+        }
+        AppDebugLog.log(
+          'Backend optimization returned no result; switching to on-device fallback.',
+        );
+      } catch (error, stackTrace) {
+        AppDebugLog.log(
+          'Backend optimization failed: $error. Falling back to the on-device engine.',
+        );
+        debugPrintStack(stackTrace: stackTrace);
       }
     }
+    AppDebugLog.log('Running on-device optimization.');
     return _optimizeOnDevice(request);
   }
 
@@ -349,9 +366,17 @@ class PickupOptimizer {
       },
     });
 
+    final stopwatch = Stopwatch()..start();
+    AppDebugLog.log(
+      'POST $uri sent to backend. Waiting for /analyze response...',
+    );
     final response = await _http
         .post(uri, headers: headers, body: body)
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 30));
+    stopwatch.stop();
+    AppDebugLog.log(
+      'Backend responded in ${stopwatch.elapsedMilliseconds} ms with HTTP ${response.statusCode}.',
+    );
     if (response.statusCode != 200) return null;
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -434,17 +459,12 @@ class PickupOptimizer {
 
   LatLng _latLngFromJson(dynamic node) {
     final map = node as Map<String, dynamic>;
-    return LatLng(
-      _toDouble(map['lat']) ?? 0,
-      _toDouble(map['lon']) ?? 0,
-    );
+    return LatLng(_toDouble(map['lat']) ?? 0, _toDouble(map['lon']) ?? 0);
   }
 
   List<LatLng> _polylineFromJson(dynamic node) {
     if (node is! List) return const <LatLng>[];
-    return node
-        .map((e) => _latLngFromJson(e))
-        .toList(growable: false);
+    return node.map((e) => _latLngFromJson(e)).toList(growable: false);
   }
 
   Future<OptimizationResult> _optimizeOnDevice(
@@ -453,6 +473,10 @@ class PickupOptimizer {
     _usedAmap = false;
     _usedFallback = false;
     final key = request.apiKey.trim();
+
+    AppDebugLog.log(
+      'On-device engine started. AMap Web key=${key.isNotEmpty ? 'present' : 'missing'}; building driving route and candidate set.',
+    );
 
     final route =
         await _fetchDrivingRoute(key, request.driver, request.passenger) ??
@@ -576,6 +600,10 @@ class PickupOptimizer {
       return a.score.compareTo(b.score);
     });
 
+    AppDebugLog.log(
+      'Optimization finished. dataSource=$_dataSource, baseline=${baselineDriverEtaMin.toStringAsFixed(1)} min, suggestions=${suggestions.length}.',
+    );
+
     return OptimizationResult(
       dataSource: _dataSource,
       baselineDriverEtaMin: baselineDriverEtaMin,
@@ -610,7 +638,8 @@ class PickupOptimizer {
       }
       _usedAmap = true;
       return data;
-    } catch (_) {
+    } catch (error) {
+      AppDebugLog.log('AMap request failed for $path: $error');
       return null;
     }
   }

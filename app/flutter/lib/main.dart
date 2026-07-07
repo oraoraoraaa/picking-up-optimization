@@ -11,6 +11,7 @@ import 'package:x_amap_base/x_amap_base.dart';
 
 import 'src/amap_config.dart';
 import 'src/app_settings.dart';
+import 'src/debug_log.dart';
 import 'src/l10n.dart';
 import 'src/map_launcher.dart';
 import 'src/pickup_optimizer.dart';
@@ -144,6 +145,9 @@ class _DashboardPageState extends State<DashboardPage> {
         });
       }
     });
+    AppDebugLog.log(
+      'Dashboard loaded. AMap support=${_supportsAmap ? 'yes' : 'no'}, map key configured=${_hasConfiguredApiKey ? 'yes' : 'no'}.',
+    );
   }
 
   @override
@@ -496,8 +500,12 @@ class _DashboardPageState extends State<DashboardPage> {
     final controller = _mapController;
     if (location == null || controller == null) {
       _showHint(S.of(context).stillLocatingShort);
+      AppDebugLog.log(
+        'Recenter requested before a user location was available.',
+      );
       return;
     }
+    AppDebugLog.log('Recenter map to live user location.');
     controller.moveCamera(
       CameraUpdate.newLatLngZoom(location, 15.5),
       duration: 350,
@@ -882,6 +890,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final s = S.of(context);
     final pickup = _pickupSelection;
     if (pickup == null) {
+      AppDebugLog.log('Optimization blocked: pickup location is missing.');
       _showHint(
         _mode == UserMode.driver ? s.selectPassengerFirst : s.selectDriverFirst,
       );
@@ -890,6 +899,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final ownStart = _startSelection?.latLng ?? _latestUserLocation;
     if (ownStart == null) {
+      AppDebugLog.log(
+        'Optimization blocked: start location is still unavailable.',
+      );
       _showHint(s.stillLocatingLong);
       return;
     }
@@ -910,6 +922,11 @@ class _DashboardPageState extends State<DashboardPage> {
             passengerName: ownName,
             apiKey: _effectiveSearchKey,
           );
+
+    AppDebugLog.log(
+      'Start Optimization tapped: mode=${_mode.name}, pickup="${pickup.name}", start="${ownName}", backend=${hasPickupBackend ? 'configured' : 'missing'}, mapKey=${_hasConfiguredApiKey ? 'configured' : 'missing'}.',
+    );
+    AppDebugLog.log('Opening result screen and starting optimization work.');
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => ResultPage(request: request)),
