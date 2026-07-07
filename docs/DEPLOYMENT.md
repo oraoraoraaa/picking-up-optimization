@@ -44,7 +44,7 @@ It provides, in one place:
 
 See [`server/README.md`](../server/README.md) for the request/response schema and [`server/.env.example`](../server/.env.example) for all env vars.
 
-### Deploy it
+### 1.1 Deploy in Server
 
 Anything that runs a container or a static Linux binary works (Fly.io, Render, Railway, Google Cloud Run, AWS App Runner, a plain VPS…).
 
@@ -64,6 +64,27 @@ docker run --rm -p 8080:8080 \
 **Put HTTPS in front of it.** Phones should only talk to the backend over TLS. Either deploy behind a platform that terminates TLS for you (Cloud Run, Fly, Render all do), or run a reverse proxy (Caddy/nginx/Traefik) with a real certificate. Keep `AMAP_KEY` and `APP_TOKEN` as platform secrets, never in the image or in git.
 
 **Restrict the AMAP_KEY** in the AMap console to Web Service usage and, if available, to your server's egress IP, so a leaked key is less useful.
+
+### 1.2 Test the Cloud Run
+
+After the server is running, you can test the cloud run using the following example test case (the `SERVICE_URL` here assumes you use the google cloud run service):
+
+```bash
+SERVICE_URL="https://YOUR-SERVICE-URL.a.run.app"
+APP_TOKEN="your-app-token"
+
+curl -s "$SERVICE_URL/health"
+echo
+
+curl -s -X POST "$SERVICE_URL/analyze" \
+  -H "content-type: application/json" \
+  -H "x-app-token: $APP_TOKEN" \
+  -d '{
+    "driver": {"name": "A", "lon": 121.5086, "lat": 31.2454},
+    "passenger": {"name": "B", "lon": 121.4737, "lat": 31.2304}
+  }'
+echo
+```
 
 ---
 
