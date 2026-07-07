@@ -432,3 +432,65 @@ Files modified:
 - `app/flutter/test/widget_test.dart`: added localization tests (Chinese and Japanese result pages via `AppSettingsScope` + `AppSettings.inMemory`) and map-link unit tests (AMap scheme case preservation, Baidu GCJ-02 declaration, browser fallback URL).
 
 Verification: `flutter analyze` clean, `flutter test` 13/13, `flutter build macos --debug` succeeds (new pod resolved).
+
+## Backend Gateway (Server-Held Keys) + Thin-Client Mode
+
+### Implementation Update (2026-07-07, Backend Gateway + On-Device Fallback)
+
+Introduced a thin HTTP backend so the app can run on real phones without
+shipping the billable AMap **Web Service** key. The phone renders the map with
+its **SDK** key and delegates all keyed routing/geocoding to the server, which
+runs the existing Rust core. See [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) for the
+full deploy + mobile-bundling guide and [`server/README.md`](../server/README.md)
+for the API.
+
+**Rust core — display-ready output (so the phone needs no Web Service key):**
+
+- `core/src/amap.rs`: added `fetch_place` (reverse geocode → nearest-POI name +
+  formatted address, mirroring the app's on-device regeo) and `fetch_citycode`
+  (regeo → citycode for transit). New `Place` struct.
+- `core/src/domain.rs`: `Suggestion` and `StayPutSuggestion` gained
+  `meeting_point_name` / `meeting_point_address` (both `#[serde(default)]`).
+- `core/src/lib.rs`: `run_analysis` now reverse-geocodes each meeting point
+  (helper `resolve_place`, degrading to a coordinate string with no key), fills
+  the stay-put name from the caller-supplied passenger name (falling back to
+  regeo), and derives an `effective_city` (caller `city`, else regeo citycode)
+  so transit planning works even when the thin client sends no city.
+- `cargo test` 12/12 unchanged (the engine tests don't construct these structs).
+
+**New crate `server/` (axum), wired as a Cargo workspace:**
+
+- Root `Cargo.toml` now defines a workspace `["core", "server"]`; the per-crate
+  `core/Cargo.lock` was removed in favor of a consolidated root lockfile.
+- `server/src/main.rs`: `GET /health` and `POST /analyze`. `/analyze` accepts a
+  `Scenario`, runs `run_analysis` off the async runtime via
+  `tokio::task::spawn_blocking`, and returns the `RecommendationSet` JSON.
+  Features: `APP_TOKEN` header gate (`X-App-Token`, 401 on mismatch), an
+  in-memory TTL cache keyed on coordinates rounded to ~11 m + city
+  (`CACHE_TTL_SECS`, default 60; `X-Cache: HIT|MISS`), permissive CORS, request
+  tracing, and graceful shutdown. Config via env: `AMAP_KEY`, `APP_TOKEN`,
+  `PORT`, `BIND_ADDR`, `CACHE_TTL_SECS`.
+- `server/Dockerfile` (multi-stage, build context = repo root), `server/.env.example`,
+  `server/README.md`.
+
+**Flutter — backend mode with on-device fallback:**
+
+- `app/flutter/lib/src/amap_config.dart`: added `PICKUP_API_BASE` /
+  `PICKUP_API_TOKEN` build-time defines and `hasPickupBackend`.
+- `app/flutter/lib/src/pickup_optimizer.dart`: `optimize` is now a dispatcher —
+  when a backend base URL is configured it POSTs `{driver, passenger}` to
+  `/analyze` (with the `X-App-Token` header), parses the `RecommendationSet`
+  into the existing `OptimizationResult`/`PickupSuggestion` model
+  (`_parseRecommendationSet`), and **falls back to the renamed on-device
+  `_optimizeOnDevice`** on any backend error. A `backendBaseUrlOverride`
+  constructor seam supports tests. No changes to the result UI or model.
+- `app/flutter/test/widget_test.dart`: two new tests using `MockClient` — one
+  feeds a faithful server `RecommendationSet` fixture through the backend path
+  and asserts parsing + recommended-first ordering + `LatLng(lat, lon)`
+  mapping; the other returns HTTP 500 and asserts the on-device fallback still
+  produces a result.
+
+Verification: `cargo test --workspace` green, `cargo clippy -p pickup-op-server`
+clean, `cargo build -p pickup-op-server` succeeds; live server smoke test shows
+`/health` ok, 401 without token, 200 with token, and `X-Cache` MISS→HIT;
+`flutter analyze` clean, `flutter test` 15/15.

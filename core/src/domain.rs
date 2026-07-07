@@ -83,6 +83,12 @@ pub struct Suggestion {
     /// decision rule (at most one across the whole set).
     pub recommended: bool,
     pub meeting_point: GeoPoint,
+    /// Human-friendly meeting-point name (nearest POI); empty when unresolved.
+    #[serde(default)]
+    pub meeting_point_name: String,
+    /// Formatted meeting-point address; empty when unresolved.
+    #[serde(default)]
+    pub meeting_point_address: String,
     pub driver_eta_min: f64,
     pub passenger_eta_min: f64,
     pub completion_min: f64,
@@ -103,6 +109,12 @@ pub struct StayPutSuggestion {
     pub driver_eta_min: f64,
     pub completion_min: f64,
     pub rationale: String,
+    /// Passenger-location name (the original pickup point); empty when unresolved.
+    #[serde(default)]
+    pub meeting_point_name: String,
+    /// Passenger-location formatted address; empty when unresolved.
+    #[serde(default)]
+    pub meeting_point_address: String,
     /// Driver start -> passenger (full route).
     pub driver_route_polyline: Vec<GeoPoint>,
 }

@@ -22,6 +22,27 @@ const String amapWebKey = String.fromEnvironment(
   defaultValue: '',
 );
 
+/// Base URL of the pickup-optimization backend (the Rust `server/` crate),
+/// e.g. `https://api.example.com`. Injected with --dart-define:
+///   PICKUP_API_BASE   backend base URL (no trailing slash)
+///   PICKUP_API_TOKEN  shared secret sent as the `X-App-Token` header
+///
+/// When set, the app runs optimization through the backend (which holds the
+/// Web Service key) and only falls back to the on-device engine if the backend
+/// is unreachable. When empty, the app computes everything on-device using
+/// [effectiveAmapWebKey].
+const String pickupApiBaseUrl = String.fromEnvironment(
+  'PICKUP_API_BASE',
+  defaultValue: '',
+);
+
+const String pickupApiToken = String.fromEnvironment(
+  'PICKUP_API_TOKEN',
+  defaultValue: '',
+);
+
+bool get hasPickupBackend => pickupApiBaseUrl.trim().isNotEmpty;
+
 bool get supportsAmapPlatform {
   if (kIsWeb) return false;
   return defaultTargetPlatform == TargetPlatform.android ||

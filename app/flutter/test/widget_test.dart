@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:x_amap_base/x_amap_base.dart';
 
 import 'package:pickup_op_flutter/src/app_settings.dart';
@@ -370,6 +372,99 @@ void main() {
           greaterThanOrEqualTo(EngineTuning.minCandidateSpacingM),
         );
       }
+    });
+  });
+
+  group('backend mode (parses server RecommendationSet JSON)', () {
+    // Mirrors the JSON shape produced by the Rust `server/` crate's /analyze.
+    const serverJson = '''
+{
+  "generated_at": "2026-07-07T02:04:46Z",
+  "data_source": "amap",
+  "passenger_start": {"name": "People's Square", "lon": 121.4737, "lat": 31.2304},
+  "driver_start": {"name": "Lujiazui", "lon": 121.5086, "lat": 31.2454},
+  "stay_put": {
+    "recommended": false,
+    "driver_eta_min": 13.67,
+    "completion_min": 13.67,
+    "rationale": "Driver goes all the way to the passenger's location.",
+    "meeting_point_name": "People's Square",
+    "meeting_point_address": "Huangpu District, Shanghai",
+    "driver_route_polyline": [{"lon": 121.5086, "lat": 31.2454}, {"lon": 121.4737, "lat": 31.2304}]
+  },
+  "suggestions": [
+    {
+      "mode": "walking", "recommended": true,
+      "meeting_point": {"lon": 121.4849, "lat": 31.2381},
+      "meeting_point_name": "Nanjing Rd Station", "meeting_point_address": "Nanjing Rd",
+      "driver_eta_min": 6.5, "passenger_eta_min": 5.0, "completion_min": 6.5,
+      "driver_saved_min": 7.17, "score": 7.25, "rationale": "walk",
+      "driver_route_polyline": [{"lon": 121.5086, "lat": 31.2454}, {"lon": 121.4849, "lat": 31.2381}],
+      "passenger_path_polyline": [{"lon": 121.4737, "lat": 31.2304}, {"lon": 121.4849, "lat": 31.2381}]
+    },
+    {
+      "mode": "bicycle", "recommended": false,
+      "meeting_point": {"lon": 121.4905, "lat": 31.2400},
+      "meeting_point_name": "Bund", "meeting_point_address": "Zhongshan Rd",
+      "driver_eta_min": 5.0, "passenger_eta_min": 9.0, "completion_min": 9.0,
+      "driver_saved_min": 8.67, "score": 11.35, "rationale": "bike",
+      "driver_route_polyline": [{"lon": 121.5086, "lat": 31.2454}, {"lon": 121.4905, "lat": 31.2400}],
+      "passenger_path_polyline": [{"lon": 121.4737, "lat": 31.2304}, {"lon": 121.4905, "lat": 31.2400}]
+    }
+  ]
+}
+''';
+
+    const request = OptimizationRequest(
+      driver: _driver,
+      driverName: 'Lujiazui',
+      passenger: _passenger,
+      passengerName: "People's Square",
+      apiKey: '',
+    );
+
+    test('posts to /analyze and maps the response into suggestions', () async {
+      Uri? seenUri;
+      final mock = MockClient((req) async {
+        seenUri = req.url;
+        expect(req.method, 'POST');
+        return http.Response(serverJson, 200);
+      });
+      final optimizer = PickupOptimizer(
+        httpClient: mock,
+        backendBaseUrlOverride: 'https://api.example.test',
+      );
+
+      final result = await optimizer.optimize(request);
+
+      expect(seenUri.toString(), 'https://api.example.test/analyze');
+      expect(result.dataSource, 'amap');
+      // walking + bicycle + stay-put.
+      expect(result.suggestions.length, 3);
+      // Recommended (walking) is first; stay-put is present.
+      expect(result.recommended.mode, MobilityMode.walking);
+      expect(result.suggestions.first.recommended, isTrue);
+      expect(result.suggestions.any((s) => s.stayPut), isTrue);
+      // Polylines and names parsed as LatLng(lat, lon).
+      final walk = result.suggestions.first;
+      expect(walk.meetingPointName, 'Nanjing Rd Station');
+      expect(walk.meetingPoint.latitude, closeTo(31.2381, 1e-6));
+      expect(walk.meetingPoint.longitude, closeTo(121.4849, 1e-6));
+      expect(walk.driverRoutePolyline.length, 2);
+    });
+
+    test('falls back to the on-device engine when the backend errors', () async {
+      final mock = MockClient((req) async => http.Response('nope', 500));
+      final optimizer = PickupOptimizer(
+        httpClient: mock,
+        backendBaseUrlOverride: 'https://api.example.test',
+      );
+
+      // No web key + fallback engine => deterministic estimate result, never throws.
+      final result = await optimizer.optimize(request);
+      expect(result.dataSource, 'fallback');
+      expect(result.suggestions, isNotEmpty);
+      expect(result.suggestions.any((s) => s.stayPut), isTrue);
     });
   });
 }

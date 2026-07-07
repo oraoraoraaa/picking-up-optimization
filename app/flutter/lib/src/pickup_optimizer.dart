@@ -5,6 +5,8 @@ import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:x_amap_base/x_amap_base.dart';
 
+import 'amap_config.dart';
+
 /// On-device port of the Rust core engine (`core/src/engine.rs`).
 ///
 /// The Rust core is the reference implementation of the route-interception
@@ -287,7 +289,7 @@ List<EvaluatedOption> bestPerMode(List<EvaluatedOption> ranked) {
 }
 
 class PickupOptimizer {
-  PickupOptimizer({http.Client? httpClient})
+  PickupOptimizer({http.Client? httpClient, this.backendBaseUrlOverride})
     : _http = httpClient ?? http.Client();
 
   static const Duration _requestTimeout = Duration(seconds: 8);
@@ -302,7 +304,152 @@ class PickupOptimizer {
   bool _usedAmap = false;
   bool _usedFallback = false;
 
+  /// Optional backend base URL override (tests inject a local server);
+  /// defaults to [pickupApiBaseUrl] from build-time config.
+  final String? backendBaseUrlOverride;
+
+  String get _backendBaseUrl =>
+      (backendBaseUrlOverride ?? pickupApiBaseUrl).trim();
+
+  /// Runs optimization through the backend when one is configured, falling
+  /// back to the on-device engine if the backend is unreachable or errors.
   Future<OptimizationResult> optimize(OptimizationRequest request) async {
+    if (_backendBaseUrl.isNotEmpty) {
+      try {
+        final result = await _optimizeViaBackend(request);
+        if (result != null) return result;
+      } catch (_) {
+        // Fall through to the on-device engine on any backend failure.
+      }
+    }
+    return _optimizeOnDevice(request);
+  }
+
+  /// POSTs the scenario to the backend `/analyze` endpoint and parses the
+  /// `RecommendationSet` JSON. Returns null on a non-success response so the
+  /// caller can fall back to the on-device engine.
+  Future<OptimizationResult?> _optimizeViaBackend(
+    OptimizationRequest request,
+  ) async {
+    final uri = Uri.parse('$_backendBaseUrl/analyze');
+    final headers = <String, String>{'content-type': 'application/json'};
+    final token = pickupApiToken.trim();
+    if (token.isNotEmpty) headers['x-app-token'] = token;
+
+    final body = jsonEncode(<String, dynamic>{
+      'driver': <String, dynamic>{
+        'name': request.driverName,
+        'lon': request.driver.longitude,
+        'lat': request.driver.latitude,
+      },
+      'passenger': <String, dynamic>{
+        'name': request.passengerName,
+        'lon': request.passenger.longitude,
+        'lat': request.passenger.latitude,
+      },
+    });
+
+    final response = await _http
+        .post(uri, headers: headers, body: body)
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) return null;
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return _parseRecommendationSet(data);
+  }
+
+  OptimizationResult _parseRecommendationSet(Map<String, dynamic> data) {
+    final stayPutJson = data['stay_put'] as Map<String, dynamic>;
+    final baseline = _toDouble(stayPutJson['driver_eta_min']) ?? 0;
+
+    final suggestions = <PickupSuggestion>[];
+    for (final raw in (data['suggestions'] as List? ?? const [])) {
+      final s = raw as Map<String, dynamic>;
+      suggestions.add(
+        PickupSuggestion(
+          stayPut: false,
+          mode: _modeFromString('${s['mode']}'),
+          recommended: s['recommended'] == true,
+          meetingPoint: _latLngFromJson(s['meeting_point']),
+          meetingPointName: '${s['meeting_point_name'] ?? ''}',
+          meetingPointAddress: '${s['meeting_point_address'] ?? ''}',
+          driverEtaMin: _toDouble(s['driver_eta_min']) ?? 0,
+          passengerEtaMin: _toDouble(s['passenger_eta_min']) ?? 0,
+          completionMin: _toDouble(s['completion_min']) ?? 0,
+          driverSavedMin: _toDouble(s['driver_saved_min']) ?? 0,
+          score: _toDouble(s['score']) ?? 0,
+          driverRoutePolyline: _polylineFromJson(s['driver_route_polyline']),
+          passengerPathPolyline: _polylineFromJson(
+            s['passenger_path_polyline'],
+          ),
+        ),
+      );
+    }
+
+    suggestions.add(
+      PickupSuggestion(
+        stayPut: true,
+        mode: null,
+        recommended: stayPutJson['recommended'] == true,
+        meetingPoint: _latLngFromJson(data['passenger_start']),
+        meetingPointName: '${stayPutJson['meeting_point_name'] ?? ''}',
+        meetingPointAddress: '${stayPutJson['meeting_point_address'] ?? ''}',
+        driverEtaMin: baseline,
+        passengerEtaMin: 0,
+        completionMin: _toDouble(stayPutJson['completion_min']) ?? baseline,
+        driverSavedMin: 0,
+        score: baseline,
+        driverRoutePolyline: _polylineFromJson(
+          stayPutJson['driver_route_polyline'],
+        ),
+        passengerPathPolyline: const <LatLng>[],
+      ),
+    );
+
+    // Recommended entry first, the rest ascending by score (matches on-device).
+    suggestions.sort((a, b) {
+      if (a.recommended != b.recommended) return a.recommended ? -1 : 1;
+      return a.score.compareTo(b.score);
+    });
+
+    return OptimizationResult(
+      dataSource: '${data['data_source'] ?? 'fallback'}',
+      baselineDriverEtaMin: baseline,
+      suggestions: suggestions,
+    );
+  }
+
+  MobilityMode? _modeFromString(String value) {
+    switch (value) {
+      case 'walking':
+        return MobilityMode.walking;
+      case 'bicycle':
+        return MobilityMode.bicycle;
+      case 'transit':
+        return MobilityMode.transit;
+      default:
+        return null;
+    }
+  }
+
+  LatLng _latLngFromJson(dynamic node) {
+    final map = node as Map<String, dynamic>;
+    return LatLng(
+      _toDouble(map['lat']) ?? 0,
+      _toDouble(map['lon']) ?? 0,
+    );
+  }
+
+  List<LatLng> _polylineFromJson(dynamic node) {
+    if (node is! List) return const <LatLng>[];
+    return node
+        .map((e) => _latLngFromJson(e))
+        .toList(growable: false);
+  }
+
+  Future<OptimizationResult> _optimizeOnDevice(
+    OptimizationRequest request,
+  ) async {
     _usedAmap = false;
     _usedFallback = false;
     final key = request.apiKey.trim();

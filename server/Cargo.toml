@@ -1,0 +1,18 @@
+[package]
+name = "pickup-op-server"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "pickup-op-server"
+path = "src/main.rs"
+
+[dependencies]
+pickup-op = { path = "../core" }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

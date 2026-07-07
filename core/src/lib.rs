@@ -42,10 +42,35 @@ fn passenger_polyline(
         .unwrap_or_else(|| vec![passenger, meeting_point])
 }
 
+/// Reverse-geocode a meeting point to `(name, address)`. When no key/network
+/// is available the name is empty and the address degrades to coordinates so
+/// the UI always has something to show.
+fn resolve_place(
+    client: &Client,
+    api_key: Option<&str>,
+    point: GeoPoint,
+) -> (String, String) {
+    let place = api_key.and_then(|key| amap::fetch_place(client, key, point));
+    match place {
+        Some(p) => {
+            let address = if p.address.is_empty() {
+                format!("{:.5}, {:.5}", point.lon, point.lat)
+            } else {
+                p.address
+            };
+            (p.name, address)
+        }
+        None => (String::new(), format!("{:.5}, {:.5}", point.lon, point.lat)),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn to_suggestion(
     option: &EvaluatedOption,
     recommended: bool,
     baseline_driver_eta_min: f64,
+    meeting_point_name: String,
+    meeting_point_address: String,
     driver_route_polyline: Vec<GeoPoint>,
     passenger_path_polyline: Vec<GeoPoint>,
 ) -> Suggestion {
@@ -54,6 +79,8 @@ fn to_suggestion(
         mode: option.mode,
         recommended,
         meeting_point: option.meeting_point,
+        meeting_point_name,
+        meeting_point_address,
         driver_eta_min: round2(option.driver_eta_min),
         passenger_eta_min: round2(option.passenger_eta_min),
         completion_min: round2(option.completion_min),
@@ -85,6 +112,16 @@ pub fn run_analysis(
     let driver = scenario.driver.point();
     let passenger = scenario.passenger.point();
 
+    // Transit planning needs a citycode; when the caller did not supply a city
+    // (the thin mobile client never does), derive it from the passenger.
+    let effective_city = scenario
+        .city
+        .as_deref()
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+        .map(str::to_string)
+        .or_else(|| api_key.and_then(|key| amap::fetch_citycode(&client, key, passenger)));
+
     let mut used_amap = false;
     let mut used_fallback = false;
 
@@ -110,7 +147,7 @@ pub fn run_analysis(
                         mode,
                         passenger,
                         candidate.point,
-                        scenario.city.as_deref(),
+                        effective_city.as_deref(),
                     )
                 })
                 .inspect(|_| used_amap = true)
@@ -153,20 +190,38 @@ pub fn run_analysis(
                 passenger,
                 option.meeting_point,
             );
+            let (name, address) = resolve_place(&client, api_key, option.meeting_point);
             to_suggestion(
                 option,
                 switch_wins && index == 0,
                 baseline_driver_eta_min,
+                name,
+                address,
                 driver_route_polyline,
                 passenger_path_polyline,
             )
         })
         .collect();
 
+    // The stay-put meeting point is the passenger's location; prefer the
+    // caller-supplied name, otherwise reverse-geocode it.
+    let (stay_name, stay_address) = {
+        let (resolved_name, address) = resolve_place(&client, api_key, passenger);
+        let supplied = scenario.passenger.name.trim();
+        let name = if supplied.is_empty() {
+            resolved_name
+        } else {
+            supplied.to_string()
+        };
+        (name, address)
+    };
+
     let stay_put = StayPutSuggestion {
         recommended: !switch_wins,
         driver_eta_min: round2(baseline_driver_eta_min),
         completion_min: round2(baseline_driver_eta_min),
+        meeting_point_name: stay_name,
+        meeting_point_address: stay_address,
         rationale: if switch_wins {
             "Driver goes all the way to the passenger's location.".to_string()
         } else {

@@ -13,6 +13,7 @@ const DRIVING_URL: &str = "https://restapi.amap.com/v3/direction/driving";
 const WALKING_URL: &str = "https://restapi.amap.com/v3/direction/walking";
 const BICYCLING_URL: &str = "https://restapi.amap.com/v4/direction/bicycling";
 const TRANSIT_URL: &str = "https://restapi.amap.com/v3/direction/transit/integrated";
+const REGEO_URL: &str = "https://restapi.amap.com/v3/geocode/regeo";
 
 /// Driving detour factor and speeds used by the fallback estimators.
 const FALLBACK_DETOUR_FACTOR: f64 = 1.35;
@@ -221,6 +222,60 @@ pub fn fetch_passenger_secs(
             body.pointer("/route/transits/0/duration").and_then(value_to_f64)
         }
     }
+}
+
+/// A place resolved from a coordinate via reverse geocoding.
+#[derive(Clone, Debug, Default)]
+pub struct Place {
+    /// Nearest POI name, or empty when none is close enough.
+    pub name: String,
+    /// Formatted address, or empty when unavailable.
+    pub address: String,
+}
+
+/// Reverse-geocode a coordinate to a human-friendly name (nearest POI
+/// preferred) and formatted address. Mirrors the app's on-device regeo.
+pub fn fetch_place(client: &Client, key: &str, point: GeoPoint) -> Option<Place> {
+    let params = [
+        ("location", to_lonlat(point)),
+        ("extensions", "all".to_string()),
+        ("radius", "300".to_string()),
+        ("key", key.to_string()),
+    ];
+    let body = get_json(client, REGEO_URL, &params)?;
+
+    let name = body
+        .pointer("/regeocode/pois/0/name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("")
+        .to_string();
+
+    let address = body
+        .pointer("/regeocode/formatted_address")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("")
+        .to_string();
+
+    Some(Place { name, address })
+}
+
+/// Reverse-geocode a coordinate to its AMap citycode, needed for transit
+/// planning when the caller did not supply a city.
+pub fn fetch_citycode(client: &Client, key: &str, point: GeoPoint) -> Option<String> {
+    let params = [
+        ("location", to_lonlat(point)),
+        ("key", key.to_string()),
+    ];
+    let body = get_json(client, REGEO_URL, &params)?;
+    body.pointer("/regeocode/addressComponent/citycode")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
 }
 
 /// Straight-line synthetic driving route used when AMap is unavailable.

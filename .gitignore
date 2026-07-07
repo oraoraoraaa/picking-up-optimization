@@ -35,9 +35,9 @@ Thumbs.db
 /app/flutter/**/.svn/
 /app/flutter/**/.swiftpm/
 /app/flutter/**/migrate_working_dir/
-/app/flutter/**/.iml
-/app/flutter/**/.ipr
-/app/flutter/**/.iws
+/app/flutter/**/*.iml
+/app/flutter/**/*.ipr
+/app/flutter/**/*.iws
 /app/flutter/**/.idea/
 /app/flutter/**/doc/api/
 /app/flutter/**/ios/Flutter/.last_build_id
